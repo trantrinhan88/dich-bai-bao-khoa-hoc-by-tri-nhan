@@ -32,6 +32,13 @@ const INITIAL_DOD: IDodItem[] = [
     sub: "Kỹ thuật kết xuất tĩnh cho tốc độ vượt trội",
     detail: "Sử dụng cơ chế Static Site Generation (SSG) hoặc Incremental Static Regeneration (ISR) của Next.js để sinh ra mã HTML tĩnh, tối ưu hóa tối đa thời gian phản hồi trang đầu tiên (FCP) phục vụ mục đích đọc báo tốc độ cao.",
     checked: true
+  },
+  {
+    id: 'anti-text-loss',
+    title: "CHỐNG MẤT CHỮ PDF (ANTI-TEXT-LOSS STANDARD)",
+    sub: "Thuật toán tọa độ & Cấu hình ngắt trang in ấn",
+    detail: "Đảm bảo trích xuất cấu trúc văn bản đa cột (left/right) theo tọa độ x, y khoa học. Nối liền các từ bị gạch nối ở cuối dòng và lọc bỏ nhiễu lề biên (headers, footers). Xuất bản PDF sử dụng chiều cao h-auto co giãn tự động và chế độ pagebreak ngắt trang in ấn thông minh tránh tràn chữ.",
+    checked: true
   }
 ];
 

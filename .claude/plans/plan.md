@@ -155,8 +155,114 @@ export default function MagazinePortal({ magazineData }: Props) {
 3. **Tối ưu SEO & Tải trang:**
 * Sử dụng cơ chế **Static Site Generation (SSG)** hoặc **Incremental Static Regeneration (ISR)** của Next.js để sinh ra mã HTML tĩnh, tối ưu hóa tối đa thời gian phản hồi trang đầu tiên (FCP) phục vụ mục đích đọc báo tốc độ cao.
 
+Chào bạn, việc ứng dụng Next.js của bạn không hiển thị đầy đủ chữ từ file PDF đính kèm (hoặc từ dữ liệu JSON cấu trúc) thường xuất phát từ một lỗi rất phổ biến trong lập trình giao diện: **Lỗi tràn chữ (Text Overflow) hoặc Xung đột chiều cao cố định (Fixed Height Constraint)** khi chuyển đổi từ layout báo giấy sang CSS Grid.
 
+Khi một bài viết có nội dung dài (hoặc chứa các từ chuyên ngành siêu dài như trên trang 48), nếu container bọc ngoài bị giới hạn thuộc tính CSS, trình duyệt sẽ tự động cắt bỏ phần chữ thừa.
+
+Để khắc phục triệt để vấn đề "không nhận/hiển thị đầy đủ chữ", bạn hãy áp dụng ngay bộ 3 quy tắc sửa lỗi CSS dưới đây vào component Next.js của mình:
+
+---
+
+## 🛠️ CÁC BƯỚC KHẮC PHỤC LỖI HIỂN THỊ CHỮ TRÊN NEXT.JS
+
+### 1. Sửa lỗi ẩn chữ do đặt cố định chiều cao (`h-full` hoặc `h-[fixed]`)
+
+Trong đoạn code mẫu trước đó, thuộc tính `h-full` (height 100%) nằm trong thẻ `<section>` hoặc `<div>` bọc bài viết có thể ép container không được nở dài ra khi chữ quá nhiều.
+
+* **Cách sửa:** Đổi toàn bộ thuộc tính chiều cao của các container chứa chữ thành chiều cao tự động nở (`h-auto` hoặc xóa hẳn thuộc tính chiều cao).
+
+### 2. Thêm quy tắc bẻ hàng đối với từ siêu dài (`Word Break`)
+
+Các thuật ngữ khoa học, link URL hoặc các chuỗi ký tự dài liên tục trong file gốc nếu không được cấu hình bẻ hàng sẽ tự động đâm thủng layout grid và biến mất khỏi khung nhìn.
+
+* **Cách sửa:** Thêm lớp `break-words` hoặc `whitespace-pre-line` vào thẻ hiển thị nội dung bài viết.
+
+---
+
+## 💻 ĐOẠN CODE CẬP NHẬT CHỐNG MẤT CHỮ (TAILWIND CSS)
+
+Hãy kiểm tra và cập nhật lại phần render bài viết của bạn theo form chuẩn dưới đây (chú ý các class được **bôi đậm**):
+
+```tsx
+// Component hiển thị từng bài viết lẻ (Article Card)
+function ArticleWidget({ article }: { article: IArticleItem }) {
+  return (
+    <article className="group border-b border-gray-100 pb-4 last:border-0 cursor-pointer h-auto">
+      <div className="flex justify-between items-start gap-4">
+        
+        {/* Thêm break-words để tiêu đề dài tự động xuống hàng, không bị đẩy ra ngoài */}
+        <div className="space-y-1 min-w-0 flex-1 break-words">
+          {article.badge && (
+            <span className="text-xs font-sans font-bold tracking-wider text-red-700 uppercase block">
+              {article.badge}
+            </span>
+          )}
+          <h3 className="text-lg font-bold leading-snug text-neutral-900 group-hover:text-blue-900 transition-colors">
+            {article.title}
+          </h3>
+        </div>
+
+        {/* Khóa chiều rộng của số trang để không bị co chữ khi tiêu đề quá dài */}
+        {article.pageNumber && (
+          <span className="font-sans text-sm font-bold text-neutral-400 group-hover:text-black pt-1 shrink-0">
+            {article.pageNumber}
+          </span>
+        )}
+      </div>
+
+      {/* QUY TIẾT CỐT LÕI: 
+        - Đổi text-sm thành h-auto để tự động co giãn theo độ dài văn bản dịch.
+        - Whitespace-pre-line giúp giữ nguyên các dấu xuống dòng tự nhiên trong đoạn văn gốc.
+      */}
+      {article.contentSnippet && (
+        <p className="text-sm text-neutral-600 font-sans leading-relaxed mt-2 h-auto break-words whitespace-pre-line">
+          {article.contentSnippet}
+        </p>
+      )}
+    </article>
+  );
+}
 
 ```
 
-```
+### 3. Kiểm tra lại File Dữ liệu đầu vào (`Data Source`)
+
+Nếu sau khi sửa CSS mà chữ vẫn bị thiếu, lỗi nằm ở **bước trích xuất (parsing) dữ liệu từ PDF sang JSON**:
+
+* Hãy đảm bảo chuỗi ký tự nhập vào trong file dữ liệu của bạn không chứa các ký tự đặc biệt vô tình đóng chuỗi sớm (như dấu ngoặc kép `"` chưa được escape `\"`).
+* Hãy dùng thuộc tính **Template Literals** (dấu bọc huyền ` ` thay vì dấu nháy đơn/kép) trong file data của Next.js nếu bạn copy-paste các đoạn văn dài có dấu xuống dòng trực tiếp từ tệp PDF.
+
+Bạn hãy thử rà soát lại thuộc tính chiều cao `h-full` ở các tầng component bọc ngoài nhé, 90% lỗi biến mất chữ trên giao diện dạng cột của Next.js là do class này ép khung!
+
+---
+
+## 🏛️ SECTION 4: TIÊU CHUẨN XỬ LÝ PDF KHOA HỌC & CHỐNG MẤT CHỮ
+
+Khi xử lý các tài liệu tạp chí, báo cáo nghiên cứu khoa học bằng tiếng Anh định dạng PDF, kỹ sư phát triển bắt buộc phải tuân thủ bộ quy tắc kỹ thuật dưới đây để ngăn ngừa triệt để hiện tượng mất chữ, xáo trộn dòng và lỗi dịch thuật.
+
+### 1. Thuật toán Sắp xếp Nhận diện Cột (Column-Aware Coordinate Sorting)
+Các tài liệu khoa học thường được chia thành 2 cột. Nếu trích xuất văn bản dòng ngang tuần tự sẽ gây xáo trộn câu chữ nghiêm trọng (trộn lẫn cột trái và cột phải).
+* **Quy chuẩn:** Phải xác định trục giữa trang dựa trên chiều rộng viewport của PDF page (`viewport.width`).
+* **Quy trình phân loại vị trí khối chữ (`transform[4]` là tọa độ x, `transform[5]` là tọa độ y):**
+  - **Khối xuyên cột (Full-width / Span):** Nếu khối văn bản trải dài cắt ngang trục giữa trang (như tiêu đề chính, Abstract, bảng biểu lớn), khối này được xếp vào dòng đọc toàn trang.
+  - **Cột trái (Left Column):** Tọa độ `x` nằm hoàn toàn bên trái trục giữa (`x < width / 2`).
+  - **Cột phải (Right Column):** Tọa độ `x` nằm hoàn toàn bên phải trục giữa (`x >= width / 2`).
+* **Sắp xếp thứ tự đọc:** Phải gom nhóm các khối chữ và sắp xếp theo chiều đọc học thuật: Các khối Full-width hàng đầu -> Toàn bộ các khối Cột trái (sắp xếp theo `y` giảm dần, `x` tăng dần) -> Toàn bộ các khối Cột phải (sắp xếp theo `y` giảm dần, `x` tăng dần) -> Khối Full-width hàng cuối.
+
+### 2. Bộ xử lý Từ nối Gạch ngang (Hyphenation Reassembly)
+Văn bản PDF nén chặt thường ngắt dòng bằng dấu gạch nối (ví dụ: `electro-\nmagnetic` hoặc `semi-\nconductor`).
+* **Quy chuẩn:** Sử dụng bộ lọc Regex để phát hiện và nối lại các từ bị gạch nối ở cuối dòng trước khi đưa vào dịch AI.
+* **Biểu thức chính quy đề xuất:** `(\w+)-\s+(\w+)` được thay thế bằng `$1$2` (ví dụ: `electro- magnetic` -> `electromagnetic`) để AI dịch đúng nghĩa từ đơn hoàn chỉnh, tránh tách cụm từ gây dịch sai lệch/mất ngữ nghĩa.
+
+### 3. Bộ lọc Nhiễu lề Trang (Academic Margin Filtering)
+Các thông tin lề trang (Headers, Footers, DOIs, số trang) nếu lọt vào giữa đoạn văn sẽ cắt vụn câu chữ làm câu dịch bị gián đoạn.
+* **Quy chuẩn:** 
+  - Loại bỏ các khối có tọa độ `y` quá sát lề trên hoặc lề dưới của trang PDF (ví dụ: `y < 40` hoặc `y > viewport.height - 40` đơn vị điểm ảnh).
+  - Sử dụng biểu thức chính quy loại bỏ số trang đơn lẻ (`/^\d+$/`) và chuỗi liên kết DOI (`/https:\/\/doi\.org/` hoặc `10\.\d{4}/`).
+
+### 4. Thiết kế Layout Kết xuất PDF Không Giới hạn Chiều cao
+Khi dùng `html2pdf.js` xuất bản tài liệu song ngữ dạng báo in, nếu container bị giới hạn CSS, chữ sẽ bị cắt cụt ở lề trang.
+* **Quy chuẩn CSS:**
+  - Tuyệt đối không dùng `h-full` hay `h-[cố định]` cho các thẻ chứa đoạn văn dài. Thay thế bằng `h-auto` hoặc loại bỏ thuộc tính chiều cao.
+  - Áp dụng thuộc tính bẻ dòng linh hoạt: `break-words` kết hợp `whitespace-pre-line` để giữ lại cấu trúc đoạn văn tự nhiên của bản dịch.
+  - Cấu hình tùy chọn `pagebreak` cho `html2pdf.js` với chế độ tự động ngắt dòng thông minh: `{ mode: ['avoid-all', 'css', 'legacy'] }` giúp chia trang tự nhiên tại các ranh giới thẻ `<p>` hoặc `<section>`, tránh cắt ngang giữa dòng chữ.

@@ -188,7 +188,13 @@ ${ncxNavPoints}  </navMap>
   // 6. Generate OEBPS/chapterX.html files
   sections.forEach((sec, idx) => {
     const paragraphsHtml = sec.content
-      .map(p => `      <p style="text-indent: 1.5em; margin: 0 0 1em 0; line-height: 1.6; text-align: justify;">${p}</p>`)
+      .map(p => {
+        const trimmed = p.trim();
+        if (trimmed.startsWith('<div') || trimmed.startsWith('<h3') || trimmed.startsWith('<h2') || trimmed.startsWith('<h1') || trimmed.startsWith('<p')) {
+          return trimmed;
+        }
+        return `      <p style="text-indent: 1.5em; margin: 0 0 1em 0; line-height: 1.6; text-align: justify;">${p}</p>`;
+      })
       .join('\n');
 
     zip.addFile(`OEBPS/chapter${idx + 1}.html`, `<?xml version="1.0" encoding="utf-8"?>

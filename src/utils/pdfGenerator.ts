@@ -36,15 +36,21 @@ export async function downloadPdf(
     // Construct beautifully styled chapter segments
     const chaptersHtml = sections.map((sec, idx) => {
       const paragraphsHtml = sec.content
-        .map(p => `        <p style="text-indent: 1.5em; margin: 0 0 14pt 0; text-align: justify; line-height: 1.6; font-size: 14pt; font-weight: normal; font-family: 'Times New Roman', Times, serif;">${p}</p>`)
+        .map(p => {
+          const trimmed = p.trim();
+          if (trimmed.startsWith('<div') || trimmed.startsWith('<h3') || trimmed.startsWith('<h2') || trimmed.startsWith('<h1') || trimmed.startsWith('<p')) {
+            return trimmed;
+          }
+          return `        <p style="text-indent: 1.5em; margin: 0 0 14pt 0; text-align: justify; line-height: 1.6; font-size: 14pt; font-weight: normal; font-family: 'Times New Roman', Times, serif; height: auto; page-break-inside: auto; break-inside: auto;">${p}</p>`;
+        })
         .join('\n');
 
       return `
-        <div style="margin-bottom: 35px; page-break-inside: avoid; font-family: 'Times New Roman', Times, serif;">
-          <h2 style="font-family: 'Times New Roman', Times, serif; font-weight: bold; font-size: 16pt; border-bottom: 2px solid #111111; padding-bottom: 4px; margin: 0 0 16px 0; color: #111111;">
+        <div style="margin-bottom: 35px; font-family: 'Times New Roman', Times, serif; page-break-inside: auto; break-inside: auto; height: auto;">
+          <h2 style="font-family: 'Times New Roman', Times, serif; font-weight: bold; font-size: 16pt; border-bottom: 2px solid #111111; padding-bottom: 4px; margin: 0 0 16px 0; color: #111111; page-break-after: avoid; break-after: avoid;">
             Mục 0${idx + 1}: ${sec.title}
           </h2>
-          <div>
+          <div style="height: auto; page-break-inside: auto; break-inside: auto;">
             ${paragraphsHtml}
           </div>
         </div>
@@ -66,7 +72,7 @@ export async function downloadPdf(
         </div>
       </div>
       
-      <main style="margin-top: 10px; font-family: 'Times New Roman', Times, serif;">
+      <main style="margin-top: 10px; font-family: 'Times New Roman', Times, serif; height: auto;">
         ${chaptersHtml}
       </main>
     `;
@@ -80,6 +86,7 @@ export async function downloadPdf(
       filename:     `${title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2.2, useCORS: true, letterRendering: true },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 

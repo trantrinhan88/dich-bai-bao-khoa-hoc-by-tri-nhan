@@ -10,6 +10,11 @@ interface ITranslationBlock {
   vi: string;
   status: 'pending' | 'translating' | 'done';
   page: number;
+  fontSize?: number;
+  minY?: number;
+  maxY?: number;
+  type?: 'header' | 'footer' | 'title' | 'body' | 'small';
+  shouldTranslate?: boolean;
 }
 
 // Function to dynamically load PDF.js from CDN
@@ -136,7 +141,8 @@ export default function TranslationStudio() {
       setProgress(30);
       setStatusText(`Đã tìm thấy ${numPages} trang. Bắt đầu trích xuất văn bản từ các trang...`);
 
-      const extractedBlocks: ITranslationBlock[] = [];
+      const allRawBlocks: any[] = [];
+      const pageHeightsMap: { [page: number]: number } = {};
 
       // 4. Extract Text Page by Page (Cap at 12 pages for optimal web performance)
       const pagesToProcess = Math.min(numPages, 12);
@@ -145,54 +151,343 @@ export default function TranslationStudio() {
         setProgress(30 + Math.round((pageNum / pagesToProcess) * 20));
 
         const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
+        const viewport = page.getViewport({ scale: 1.0 });
+        const pageWidth = viewport.width;
+        const pageHeight = viewport.height;
+        pageHeightsMap[pageNum] = pageHeight;
         
-        // Group strings of text
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        const cleanedDiacriticsText = cleanVietnameseDiacritics(pageText);
-        const cleanText = cleanedDiacriticsText.replace(/\s+/g, ' ').trim();
-
-        if (cleanText.length > 5) {
-          const sentences = cleanText.split(/(?<=[.!?])\s+/);
+        const textContent = await page.getTextContent();
+        const items = textContent.items as any[];
+        
+        // 1. Lọc nhiễu học thuật ở lề biên (Academic Margin Filtering) - Giữ lại để phân loại untranslated thay vì xoá sạch
+        const validItems = items.filter((item: any) => {
+          if (!item.str || !item.transform) return false;
+          const s = item.str.trim();
+          if (!s) return false;
           
-          if (layoutStyle === 'bilingual') {
-            // Bilingual mode: extract each sentence as an individual block for sentence-by-sentence translation
-            for (let sIdx = 0; sIdx < sentences.length; sIdx++) {
-              const sentence = sentences[sIdx].trim();
-              if (sentence.length > 3) {
-                extractedBlocks.push({
-                  en: sentence,
-                  vi: '',
-                  status: 'pending',
-                  page: pageNum
-                });
-              }
-            }
-          } else {
-            // Other modes: heuristic sentence grouping (approx. 3 sentences per block)
-            let currentParagraph: string[] = [];
-            for (let sIdx = 0; sIdx < sentences.length; sIdx++) {
-              const sentence = sentences[sIdx].trim();
-              if (sentence.length > 3) {
-                currentParagraph.push(sentence);
-                if (currentParagraph.length >= 3 || sIdx === sentences.length - 1) {
-                  extractedBlocks.push({
-                    en: currentParagraph.join(' '),
-                    vi: '',
-                    status: 'pending',
-                    page: pageNum
-                  });
-                  currentParagraph = [];
-                }
-              }
+          const y = item.transform[5];
+          // Chỉ lọc bỏ các số trang đơn lẻ trơ trọi, link DOI cực ngắn lề biên để tránh rác layout
+          if (y < 45 || y > pageHeight - 45) {
+            if (/^\d+$/.test(s) || /^\d+\s*of\s*\d+$/i.test(s) || s.length < 3) {
+              return false;
             }
           }
+          return true;
+        });
+
+        // 2. Thuật toán phân luồng Cột (Column-Aware Coordinate Sorting)
+        const mid = pageWidth / 2;
+        const leftBound = mid - 15;
+        const rightBound = mid + 15;
+
+        // Phân loại các khối chữ theo vị trí địa lý trên trang
+        const leftHalfItems = validItems.filter((item: any) => item.transform[4] + (item.width || 0) < mid);
+        const rightHalfItems = validItems.filter((item: any) => item.transform[4] > mid);
+
+        // Ngưỡng phát hiện trang song cột: cột bên phải phải có số lượng khối chữ đáng kể
+        const isTwoColumn = rightHalfItems.length > 3 && (rightHalfItems.length / validItems.length) > 0.08;
+
+        let finalItems: any[] = [];
+
+        if (!isTwoColumn) {
+          // Trang đơn cột: Sắp xếp tuần tự từ trên xuống dưới, từ trái qua phải
+          finalItems = [...validItems].sort((a: any, b: any) => {
+            const yA = a.transform[5];
+            const yB = b.transform[5];
+            const xA = a.transform[4];
+            const xB = b.transform[4];
+            if (Math.abs(yA - yB) < 4) {
+              return xA - xB;
+            }
+            return yB - yA;
+          });
+        } else {
+          // Trang song cột: Áp dụng thuật toán phân luồng đọc cột học thuật
+          const leftColItems: any[] = [];
+          const rightColItems: any[] = [];
+          const fullWidthItems: any[] = [];
+
+          validItems.forEach((item: any) => {
+            const x = item.transform[4];
+            const w = item.width || 0;
+            if (x < leftBound && (x + w) > rightBound) {
+              fullWidthItems.push(item);
+            } else if (x + w < rightBound) {
+              leftColItems.push(item);
+            } else {
+              rightColItems.push(item);
+            }
+          });
+
+          // Xác định vùng hai cột để phân chia luồng đọc
+          let highestTwoColY = 0;
+          let lowestTwoColY = pageHeight;
+
+          leftColItems.concat(rightColItems).forEach((item: any) => {
+            const y = item.transform[5];
+            if (y > highestTwoColY) highestTwoColY = y;
+            if (y < lowestTwoColY) lowestTwoColY = y;
+          });
+
+          // Tách các khối chữ thành 3 vùng đứng: Trên hai cột, Giữa hai cột, Dưới hai cột
+          const topFullItems: any[] = [];
+          const bottomFullItems: any[] = [];
+          const midFullItems: any[] = [];
+          const leftColumn: any[] = [];
+          const rightColumn: any[] = [];
+
+          validItems.forEach((item: any) => {
+            const x = item.transform[4];
+            const y = item.transform[5];
+            const w = item.width || 0;
+
+            if (y > highestTwoColY) {
+              topFullItems.push(item);
+            } else if (y < lowestTwoColY) {
+              bottomFullItems.push(item);
+            } else {
+              // Vùng ở giữa
+              if (x < leftBound && (x + w) > rightBound) {
+                midFullItems.push(item);
+              } else if (x + w < rightBound) {
+                leftColumn.push(item);
+              } else {
+                rightColumn.push(item);
+              }
+            }
+          });
+
+          // Định nghĩa bộ so sánh sắp xếp (y giảm dần, x tăng dần)
+          const coordinateComparator = (a: any, b: any) => {
+            const yA = a.transform[5];
+            const yB = b.transform[5];
+            const xA = a.transform[4];
+            const xB = b.transform[4];
+            if (Math.abs(yA - yB) < 4) {
+              return xA - xB;
+            }
+            return yB - yA;
+          };
+
+          // Sắp xếp từng phân vùng
+          topFullItems.sort(coordinateComparator);
+          leftColumn.sort(coordinateComparator);
+          rightColumn.sort(coordinateComparator);
+          midFullItems.sort(coordinateComparator);
+          bottomFullItems.sort(coordinateComparator);
+
+          // Lắp ghép tuần tự luồng đọc học thuật
+          finalItems = [
+            ...topFullItems,
+            ...leftColumn,
+            ...rightColumn,
+            ...midFullItems,
+            ...bottomFullItems
+          ];
         }
+
+        // 3. Nhóm các items thành các khối (blocks) dựa trên tọa độ và cỡ chữ
+        const pageBlocks: any[] = [];
+        let currentBlock: any = null;
+
+        finalItems.forEach((item: any) => {
+          const s = item.str;
+          if (!s.trim()) return;
+
+          // Cỡ chữ được tính từ tỷ lệ transform[3] hoặc height
+          const itemFontSize = Math.abs(item.transform[3]) || item.height || 10;
+          const itemX = item.transform[4];
+          const itemY = item.transform[5];
+
+          if (!currentBlock) {
+            currentBlock = {
+              en: s,
+              fontSize: itemFontSize,
+              minY: itemY,
+              maxY: itemY,
+              page: pageNum,
+              items: [item]
+            };
+            return;
+          }
+
+          const prevItem = currentBlock.items[currentBlock.items.length - 1];
+          const prevY = prevItem.transform[5];
+          const prevFontSize = Math.abs(prevItem.transform[3]) || prevItem.height || 10;
+
+          // Kiểm tra xem item mới có cùng dòng với item trước đó không
+          const sameLine = Math.abs(itemY - prevY) < 4;
+          // Khoảng cách chiều dọc giữa 2 item liên tiếp
+          const verticalGap = prevY - itemY;
+          // Kiểm tra cỡ chữ có khớp nhau không
+          const fontMatches = Math.abs(itemFontSize - currentBlock.fontSize) < 1.5;
+
+          let shouldAppend = false;
+          if (sameLine) {
+            shouldAppend = true;
+          } else if (verticalGap > 0 && verticalGap < Math.max(prevFontSize, itemFontSize) * 1.8 && fontMatches) {
+            shouldAppend = true;
+          }
+
+          if (shouldAppend) {
+            // Xử lý từ gạch nối cuối dòng: "electro-" + "magnetic" -> "electromagnetic"
+            if (currentBlock.en.endsWith('-')) {
+              currentBlock.en = currentBlock.en.slice(0, -1) + s;
+            } else {
+              currentBlock.en += (currentBlock.en.endsWith(' ') || s.startsWith(' ') ? '' : ' ') + s;
+            }
+            currentBlock.minY = Math.min(currentBlock.minY, itemY);
+            currentBlock.maxY = Math.max(currentBlock.maxY, itemY);
+            currentBlock.items.push(item);
+          } else {
+            pageBlocks.push({
+              en: currentBlock.en.replace(/\s+/g, ' ').trim(),
+              fontSize: currentBlock.fontSize,
+              minY: currentBlock.minY,
+              maxY: currentBlock.maxY,
+              page: pageNum
+            });
+            currentBlock = {
+              en: s,
+              fontSize: itemFontSize,
+              minY: itemY,
+              maxY: itemY,
+              page: pageNum,
+              items: [item]
+            };
+          }
+        });
+
+        if (currentBlock) {
+          pageBlocks.push({
+            en: currentBlock.en.replace(/\s+/g, ' ').trim(),
+            fontSize: currentBlock.fontSize,
+            minY: currentBlock.minY,
+            maxY: currentBlock.maxY,
+            page: pageNum
+          });
+        }
+
+        allRawBlocks.push(...pageBlocks);
       }
 
-      if (extractedBlocks.length === 0) {
+      if (allRawBlocks.length === 0) {
         throw new Error('Không thể tìm thấy hoặc trích xuất nội dung văn bản tiếng Anh từ file PDF này (có thể file chỉ chứa ảnh quét scan).');
       }
+
+      // 5. Phân tích phân cấp và cấu trúc tài liệu toàn cục
+      
+      // Tìm cỡ chữ lớn nhất ở Trang 1 để xác định Tiêu đề chính (Main Title)
+      const page1Blocks = allRawBlocks.filter(b => b.page === 1);
+      let maxFontSize = 0;
+      page1Blocks.forEach(b => {
+        if (b.fontSize > maxFontSize) {
+          maxFontSize = b.fontSize;
+        }
+      });
+
+      // Tìm cỡ chữ phổ biến nhất (Dominant Font Size) của body text
+      const fontSizeWeights: { [size: number]: number } = {};
+      allRawBlocks.forEach(b => {
+        const roundedSize = Math.round(b.fontSize * 2) / 2; // làm tròn đến 0.5
+        fontSizeWeights[roundedSize] = (fontSizeWeights[roundedSize] || 0) + b.en.length;
+      });
+
+      let dominantFontSize = 10;
+      let maxWeight = 0;
+      Object.keys(fontSizeWeights).forEach(sizeStr => {
+        const size = parseFloat(sizeStr);
+        const weight = fontSizeWeights[size];
+        if (weight > maxWeight) {
+          maxWeight = weight;
+          dominantFontSize = size;
+        }
+      });
+
+      console.log('Dominant font size:', dominantFontSize);
+      console.log('Max font size on Page 1 (Title):', maxFontSize);
+
+      // 6. Phân loại và tạo danh sách khối dịch cuối cùng
+      const extractedBlocks: ITranslationBlock[] = [];
+
+      allRawBlocks.forEach(block => {
+        const pHeight = pageHeightsMap[block.page] || 842;
+        const yTop = block.maxY;
+        const yBottom = block.minY;
+        
+        // Ngưỡng lề biên cho header và footer
+        const isHeader = yTop > pHeight - 60;
+        const isFooter = yBottom < 60;
+
+        let type: 'header' | 'footer' | 'title' | 'body' | 'small' = 'body';
+        let shouldTranslate = true;
+
+        if (isHeader) {
+          type = 'header';
+          shouldTranslate = false;
+        } else if (isFooter) {
+          type = 'footer';
+          shouldTranslate = false;
+        } else if (block.page === 1 && block.fontSize >= maxFontSize - 1.5 && block.fontSize > 13) {
+          type = 'title';
+          shouldTranslate = true;
+        } else if (block.fontSize < Math.max(dominantFontSize - 0.8, 8.5)) {
+          // Trích dẫn hoặc metadata phụ có font chữ nhỏ hơn bình thường
+          type = 'small';
+          shouldTranslate = false;
+        }
+
+        // Thêm khối dịch thuật với trạng thái dịch tương ứng
+        if (!shouldTranslate) {
+          // Khối không dịch: gán luôn vi = en, status = done
+          extractedBlocks.push({
+            en: block.en,
+            vi: block.en,
+            status: 'done',
+            page: block.page,
+            fontSize: block.fontSize,
+            minY: block.minY,
+            maxY: block.maxY,
+            type: type,
+            shouldTranslate: false
+          });
+        } else {
+          // Khối cần dịch (Tiêu đề lớn nhất, nội dung bài khoa học dài)
+          if (type === 'body' && layoutStyle === 'bilingual') {
+            // Chế độ song ngữ: tách câu để dịch đối chiếu song ngữ từng câu
+            const sentences = block.en.split(/(?<=[.!?])\s+/);
+            sentences.forEach((sentence: string) => {
+              const trimmed = sentence.trim();
+              if (trimmed.length > 3) {
+                extractedBlocks.push({
+                  en: trimmed,
+                  vi: '',
+                  status: 'pending',
+                  page: block.page,
+                  fontSize: block.fontSize,
+                  minY: block.minY,
+                  maxY: block.maxY,
+                  type: type,
+                  shouldTranslate: true
+                });
+              }
+            });
+          } else {
+            // Chế độ trơn hoặc Tiêu đề chính: dịch cả khối
+            extractedBlocks.push({
+              en: block.en,
+              vi: '',
+              status: 'pending',
+              page: block.page,
+              fontSize: block.fontSize,
+              minY: block.minY,
+              maxY: block.maxY,
+              type: type,
+              shouldTranslate: true
+            });
+          }
+        }
+      });
 
       setBlocks(extractedBlocks);
       setPhase('translating');
@@ -214,28 +509,37 @@ export default function TranslationStudio() {
     const updatedBlocks = [...initialBlocks];
 
     for (let i = 0; i < updatedBlocks.length; i++) {
-      // Set to translating state
+      if (updatedBlocks[i].shouldTranslate === false || updatedBlocks[i].status === 'done') {
+        // Khối đã hoàn thành hoặc không dịch: bỏ qua nhanh và cập nhật tiến trình trực tiếp
+        updatedBlocks[i].status = 'done';
+        const translateProgress = 50 + Math.round(((i + 1) / updatedBlocks.length) * 45);
+        setProgress(translateProgress);
+        setBlocks([...updatedBlocks]);
+        continue;
+      }
+
+      // Đặt khối ở trạng thái đang dịch
       updatedBlocks[i].status = 'translating';
       setBlocks([...updatedBlocks]);
       setStatusText(`Đang chuyển ngữ khối văn bản ${i + 1}/${updatedBlocks.length} (Trang ${updatedBlocks[i].page})...`);
       
       const translation = await translateText(updatedBlocks[i].en);
       
-      // Set to done state with result
+      // Cập nhật kết quả dịch và trạng thái thành công
       updatedBlocks[i].vi = translation;
       updatedBlocks[i].status = 'done';
       setCurrentPage(updatedBlocks[i].page);
 
-      // Update progress between 50% and 95%
+      // Cập nhật tiến độ dịch từ 50% đến 95%
       const translateProgress = 50 + Math.round(((i + 1) / updatedBlocks.length) * 45);
       setProgress(translateProgress);
       setBlocks([...updatedBlocks]);
       
-      // Wait 150ms between requests to avoid rate limits
+      // Tránh vượt quá tần suất API Google Translate
       await new Promise(r => setTimeout(r, 150));
     }
 
-    // Wrap-up phase
+    // Giai đoạn chế bản và hoàn tất
     setProgress(98);
     setStatusText('Đang đóng gói và chế bản sách điện tử PDF/EPUB...');
     await new Promise(r => setTimeout(r, 1500));
@@ -266,22 +570,64 @@ export default function TranslationStudio() {
 
       if (layoutStyle === 'bilingual') {
         pageBlocks.forEach((b) => {
-          // English sentence as its own paragraph
-          pagesMap[pageNum].push(b.en);
-          // Bolded Vietnamese translation as its own paragraph
-          pagesMap[pageNum].push(`<strong>${b.vi}</strong>`);
+          if (b.shouldTranslate === false) {
+            // Header/Footer hoặc trích dẫn giữ nguyên gốc 1 lần
+            if (b.type === 'header' || b.type === 'footer') {
+              pagesMap[pageNum].push(`<div style="text-align: center; font-size: 0.85em; color: #666666; font-family: sans-serif; margin: 10px 0;">${b.en}</div>`);
+            } else if (b.type === 'small') {
+              pagesMap[pageNum].push(`<div style="font-size: 0.9em; color: #555555; font-style: italic; border-left: 2px solid #cccccc; padding-left: 10px; margin: 10px 0;">${b.en}</div>`);
+            } else {
+              pagesMap[pageNum].push(b.en);
+            }
+          } else {
+            if (b.type === 'title') {
+              pagesMap[pageNum].push(`<h3 style="text-align: center; font-weight: bold; text-transform: uppercase;">${b.en}</h3>`);
+              pagesMap[pageNum].push(`<h3 style="text-align: center; font-weight: bold; text-transform: uppercase; color: #1a1a1a; margin-bottom: 20px;">${b.vi}</h3>`);
+            } else {
+              // English sentence
+              pagesMap[pageNum].push(b.en);
+              // Bolded Vietnamese translation
+              pagesMap[pageNum].push(`<strong>${b.vi}</strong>`);
+            }
+          }
         });
       } else {
         // Plain translated Vietnamese
         let currentParagraphParts: string[] = [];
         pageBlocks.forEach((b, idx) => {
-          currentParagraphParts.push(b.vi);
-
-          if (currentParagraphParts.length >= 3 || idx === pageBlocks.length - 1) {
-            pagesMap[pageNum].push(currentParagraphParts.join(' '));
-            currentParagraphParts = [];
+          if (b.shouldTranslate === false) {
+            // Xả các câu trước đó ra trước
+            if (currentParagraphParts.length > 0) {
+              pagesMap[pageNum].push(currentParagraphParts.join(' '));
+              currentParagraphParts = [];
+            }
+            // Định dạng khối không dịch tương ứng
+            if (b.type === 'header' || b.type === 'footer') {
+              pagesMap[pageNum].push(`<div style="text-align: center; font-size: 0.85em; color: #666666; font-family: sans-serif; margin: 10px 0;">${b.en}</div>`);
+            } else if (b.type === 'small') {
+              pagesMap[pageNum].push(`<div style="font-size: 0.9em; color: #555555; font-style: italic; border-left: 2px solid #cccccc; padding-left: 10px; margin: 10px 0;">${b.en}</div>`);
+            } else {
+              pagesMap[pageNum].push(b.en);
+            }
+          } else {
+            if (b.type === 'title') {
+              if (currentParagraphParts.length > 0) {
+                pagesMap[pageNum].push(currentParagraphParts.join(' '));
+                currentParagraphParts = [];
+              }
+              pagesMap[pageNum].push(`<h3 style="text-align: center; font-weight: bold; text-transform: uppercase; margin-bottom: 20px;">${b.vi}</h3>`);
+            } else {
+              currentParagraphParts.push(b.vi);
+              if (currentParagraphParts.length >= 3 || idx === pageBlocks.length - 1) {
+                pagesMap[pageNum].push(currentParagraphParts.join(' '));
+                currentParagraphParts = [];
+              }
+            }
           }
         });
+        if (currentParagraphParts.length > 0) {
+          pagesMap[pageNum].push(currentParagraphParts.join(' '));
+        }
       }
     });
 
@@ -315,22 +661,61 @@ export default function TranslationStudio() {
 
       if (layoutStyle === 'bilingual') {
         pageBlocks.forEach((b) => {
-          // English sentence as its own paragraph
-          pagesMap[pageNum].push(b.en);
-          // Bolded Vietnamese translation as its own paragraph
-          pagesMap[pageNum].push(`<strong>${b.vi}</strong>`);
+          if (b.shouldTranslate === false) {
+            if (b.type === 'header' || b.type === 'footer') {
+              pagesMap[pageNum].push(`<div style="text-align: center; font-size: 10pt; color: #555555; font-family: Arial, sans-serif; margin: 8pt 0; text-indent: 0;">${b.en}</div>`);
+            } else if (b.type === 'small') {
+              pagesMap[pageNum].push(`<div style="font-size: 11pt; color: #444444; font-style: italic; border-left: 2px solid #999999; padding-left: 12pt; margin: 10pt 0; text-indent: 0; text-align: justify;">${b.en}</div>`);
+            } else {
+              pagesMap[pageNum].push(b.en);
+            }
+          } else {
+            if (b.type === 'title') {
+              pagesMap[pageNum].push(`<h3 style="text-align: center; font-weight: bold; font-size: 16pt; text-transform: uppercase; margin: 12pt 0; text-indent: 0;">${b.en}</h3>`);
+              pagesMap[pageNum].push(`<h3 style="text-align: center; font-weight: bold; font-size: 16pt; text-transform: uppercase; color: #222222; margin-bottom: 24pt; text-indent: 0;">${b.vi}</h3>`);
+            } else {
+              // English sentence
+              pagesMap[pageNum].push(b.en);
+              // Bolded Vietnamese translation
+              pagesMap[pageNum].push(`<strong>${b.vi}</strong>`);
+            }
+          }
         });
       } else {
         // Plain translated Vietnamese
         let currentParagraphParts: string[] = [];
         pageBlocks.forEach((b, idx) => {
-          currentParagraphParts.push(b.vi);
-
-          if (currentParagraphParts.length >= 3 || idx === pageBlocks.length - 1) {
-            pagesMap[pageNum].push(currentParagraphParts.join(' '));
-            currentParagraphParts = [];
+          if (b.shouldTranslate === false) {
+            if (currentParagraphParts.length > 0) {
+              pagesMap[pageNum].push(currentParagraphParts.join(' '));
+              currentParagraphParts = [];
+            }
+            if (b.type === 'header' || b.type === 'footer') {
+              pagesMap[pageNum].push(`<div style="text-align: center; font-size: 10pt; color: #555555; font-family: Arial, sans-serif; margin: 8pt 0; text-indent: 0;">${b.en}</div>`);
+            } else if (b.type === 'small') {
+              pagesMap[pageNum].push(`<div style="font-size: 11pt; color: #444444; font-style: italic; border-left: 2px solid #999999; padding-left: 12pt; margin: 10pt 0; text-indent: 0; text-align: justify;">${b.en}</div>`);
+            } else {
+              pagesMap[pageNum].push(b.en);
+            }
+          } else {
+            if (b.type === 'title') {
+              if (currentParagraphParts.length > 0) {
+                pagesMap[pageNum].push(currentParagraphParts.join(' '));
+                currentParagraphParts = [];
+              }
+              pagesMap[pageNum].push(`<h3 style="text-align: center; font-weight: bold; font-size: 16pt; text-transform: uppercase; margin-bottom: 24pt; text-indent: 0;">${b.vi}</h3>`);
+            } else {
+              currentParagraphParts.push(b.vi);
+              if (currentParagraphParts.length >= 3 || idx === pageBlocks.length - 1) {
+                pagesMap[pageNum].push(currentParagraphParts.join(' '));
+                currentParagraphParts = [];
+              }
+            }
           }
         });
+        if (currentParagraphParts.length > 0) {
+          pagesMap[pageNum].push(currentParagraphParts.join(' '));
+        }
       }
     });
 
@@ -533,10 +918,33 @@ export default function TranslationStudio() {
               </h3>
 
               <div className="space-y-4 max-h-[350px] overflow-y-auto border-2 border-neutral-300 p-4 rounded bg-white">
-                {blocks.map((block, idx) => {
+                {blocks.map((block: any, idx) => {
                   const isPending = block.status === 'pending';
                   const isTranslating = block.status === 'translating';
                   const isDone = block.status === 'done';
+                  const isBypassed = block.shouldTranslate === false;
+
+                  let typeLabel = "Nội dung bài báo";
+                  let typeBadgeColor = "bg-emerald-100 text-emerald-850 border-emerald-200";
+                  let blockStyle = "";
+                  
+                  if (block.type === 'header') {
+                    typeLabel = "Header Lề trên - Giữ nguyên";
+                    typeBadgeColor = "bg-neutral-200 text-neutral-700 border-neutral-350";
+                    blockStyle = "bg-neutral-50/50 border-neutral-200";
+                  } else if (block.type === 'footer') {
+                    typeLabel = "Footer Lề dưới - Giữ nguyên";
+                    typeBadgeColor = "bg-neutral-200 text-neutral-700 border-neutral-350";
+                    blockStyle = "bg-neutral-50/50 border-neutral-200";
+                  } else if (block.type === 'title') {
+                    typeLabel = "Tiêu đề lớn nhất - Cần dịch";
+                    typeBadgeColor = "bg-rose-100 text-rose-800 border-rose-300 font-extrabold";
+                    blockStyle = "bg-rose-50/30 border-rose-200";
+                  } else if (block.type === 'small') {
+                    typeLabel = "Trích dẫn / Phụ lục - Giữ nguyên";
+                    typeBadgeColor = "bg-blue-100 text-blue-800 border-blue-200";
+                    blockStyle = "bg-blue-50/30 border-blue-200";
+                  }
 
                   return (
                     <div 
@@ -546,11 +954,16 @@ export default function TranslationStudio() {
                       }`}
                     >
                       {/* English Block */}
-                      <div className="bg-neutral-50 p-3 rounded border border-neutral-200 relative">
-                        <span className="absolute top-2 right-2 text-[9px] font-sans font-black text-neutral-400 uppercase tracking-widest">
-                          Trang {block.page} • Khối {idx + 1}
-                        </span>
-                        <p className="text-xs font-sans text-neutral-800 font-semibold leading-relaxed pt-2">
+                      <div className={`p-3 rounded border relative ${blockStyle || 'bg-neutral-50 border-neutral-200'}`}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-sans font-black uppercase tracking-wider ${typeBadgeColor}`}>
+                            {typeLabel}
+                          </span>
+                          <span className="text-[9px] font-sans font-black text-neutral-400 uppercase tracking-widest">
+                            Trang {block.page} • Khối {idx + 1}
+                          </span>
+                        </div>
+                        <p className={`font-sans text-neutral-850 leading-relaxed pt-1 ${block.type === 'title' ? 'text-xs font-black uppercase' : block.type === 'small' || block.type === 'header' || block.type === 'footer' ? 'text-xs italic text-neutral-600' : 'text-xs font-semibold text-neutral-800'}`}>
                           {block.en}
                         </p>
                       </div>
@@ -559,13 +972,23 @@ export default function TranslationStudio() {
                       <div className={`p-3 rounded border relative transition-all duration-300 ${
                         isTranslating
                           ? 'bg-amber-50/50 border-amber-400 shadow-sm shadow-amber-100'
+                          : isBypassed
+                          ? 'bg-neutral-100/50 border-neutral-300'
                           : isDone
                           ? 'bg-emerald-50/30 border-emerald-400'
                           : 'bg-neutral-50/30 border-neutral-200'
                       }`}>
-                        <span className="absolute top-2 right-2 text-[9px] font-sans font-black text-neutral-400 uppercase tracking-widest">
-                          Bản dịch VI
-                        </span>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-sans font-black uppercase tracking-wider ${
+                            isBypassed 
+                              ? 'bg-neutral-200 text-neutral-600' 
+                              : isTranslating 
+                              ? 'bg-amber-100 text-amber-800 animate-pulse' 
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {isBypassed ? "Không dịch (English gốc)" : "Bản dịch VI"}
+                          </span>
+                        </div>
 
                         {isPending && (
                           <p className="text-xs font-sans text-neutral-400 italic pt-2">
@@ -586,8 +1009,14 @@ export default function TranslationStudio() {
                         )}
 
                         {isDone && (
-                          <p className={`text-xs font-sans leading-relaxed pt-2 animate-fadeIn ${
-                            layoutStyle === 'bilingual' ? 'font-extrabold text-neutral-900' : 'text-emerald-800 font-bold'
+                          <p className={`font-sans leading-relaxed pt-1 animate-fadeIn ${
+                            block.type === 'title' 
+                              ? 'text-xs font-black uppercase text-rose-950' 
+                              : block.type === 'small' || block.type === 'header' || block.type === 'footer'
+                              ? 'text-xs text-neutral-600 italic'
+                              : layoutStyle === 'bilingual' 
+                              ? 'text-xs font-extrabold text-neutral-900' 
+                              : 'text-xs text-emerald-950 font-semibold'
                           }`}>
                             {block.vi}
                           </p>
@@ -696,20 +1125,85 @@ export default function TranslationStudio() {
               {/* Sample pages content */}
               <div className="space-y-4 text-sm leading-relaxed text-[#111111] text-justify">
                 {layoutStyle === 'bilingual' ? (
-                  blocks.slice(0, 10).map((b, idx) => (
-                    <React.Fragment key={idx}>
-                      <p style={{ textIndent: '1.5em', margin: '0 0 8px 0' }}>{b.en}</p>
-                      <p style={{ textIndent: '1.5em', margin: '0 0 16px 0', fontWeight: 'bold' }}>{b.vi}</p>
-                    </React.Fragment>
-                  ))
+                  blocks.slice(0, 15).map((b: any, idx) => {
+                    if (b.shouldTranslate === false) {
+                      if (b.type === 'header' || b.type === 'footer') {
+                        return (
+                          <div key={idx} className="text-center text-[10px] text-neutral-500 font-sans tracking-wide uppercase my-2 py-1 border-y border-dashed border-neutral-200">
+                            {b.en}
+                          </div>
+                        );
+                      } else if (b.type === 'small') {
+                        return (
+                          <div key={idx} className="text-xs text-neutral-600 pl-4 border-l-2 border-neutral-300 italic my-3">
+                            {b.en}
+                          </div>
+                        );
+                      }
+                      return (
+                        <p key={idx} style={{ textIndent: '1.5em', margin: '0 0 12px 0' }}>
+                          {b.en}
+                        </p>
+                      );
+                    } else {
+                      if (b.type === 'title') {
+                        return (
+                          <React.Fragment key={idx}>
+                            <h3 className="text-center font-bold text-base uppercase tracking-tight m-0 text-black pt-2">
+                              {b.en}
+                            </h3>
+                            <h3 className="text-center font-bold text-base uppercase tracking-tight m-0 text-red-950 pb-3">
+                              {b.vi}
+                            </h3>
+                          </React.Fragment>
+                        );
+                      }
+                      return (
+                        <React.Fragment key={idx}>
+                          <p style={{ textIndent: '1.5em', margin: '0 0 4px 0' }}>{b.en}</p>
+                          <p style={{ textIndent: '1.5em', margin: '0 0 14px 0', fontWeight: 'bold', color: '#111111' }}>{b.vi}</p>
+                        </React.Fragment>
+                      );
+                    }
+                  })
                 ) : (
-                  blocks.slice(0, 10).map((b, idx) => (
-                    <p key={idx} style={{ textIndent: '1.5em', margin: '0 0 14pt 0' }}>{b.vi}</p>
-                  ))
+                  blocks.slice(0, 15).map((b: any, idx) => {
+                    if (b.shouldTranslate === false) {
+                      if (b.type === 'header' || b.type === 'footer') {
+                        return (
+                          <div key={idx} className="text-center text-[10px] text-neutral-500 font-sans tracking-wide uppercase my-2 py-1 border-y border-dashed border-neutral-200">
+                            {b.en}
+                          </div>
+                        );
+                      } else if (b.type === 'small') {
+                        return (
+                          <div key={idx} className="text-xs text-neutral-600 pl-4 border-l-2 border-neutral-300 italic my-3">
+                            {b.en}
+                          </div>
+                        );
+                      }
+                      return (
+                        <p key={idx} style={{ textIndent: '1.5em', margin: '0 0 14pt 0' }}>
+                          {b.en}
+                        </p>
+                      );
+                    } else {
+                      if (b.type === 'title') {
+                        return (
+                          <h3 key={idx} className="text-center font-bold text-base uppercase tracking-tight my-4 text-emerald-950">
+                            {b.vi}
+                          </h3>
+                        );
+                      }
+                      return (
+                        <p key={idx} style={{ textIndent: '1.5em', margin: '0 0 14pt 0' }}>{b.vi}</p>
+                      );
+                    }
+                  })
                 )}
-                {blocks.length > 10 && (
+                {blocks.length > 15 && (
                   <p className="text-center font-sans font-bold text-xs text-neutral-400 uppercase tracking-widest pt-2">
-                    ... và {blocks.length - 10} câu tiếp theo được đóng gói trong tài liệu ...
+                    ... và {blocks.length - 15} câu tiếp theo được đóng gói trong tài liệu ...
                   </p>
                 )}
               </div>
