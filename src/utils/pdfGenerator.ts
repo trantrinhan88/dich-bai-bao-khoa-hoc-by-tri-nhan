@@ -26,13 +26,6 @@ export async function downloadPdf(
   try {
     const html2pdf = await loadHtml2Pdf();
 
-    // Create a temporary off-screen container element
-    const element = document.createElement('div');
-    element.style.fontFamily = "'Times New Roman', Times, 'TimesNewRoman', serif";
-    element.style.color = '#111111';
-    element.style.padding = '35px';
-    element.style.backgroundColor = '#ffffff';
-
     // Construct beautifully styled chapter segments
     const chaptersHtml = sections.map((sec, idx) => {
       const paragraphsHtml = sec.content
@@ -57,44 +50,40 @@ export async function downloadPdf(
       `;
     }).join('\n');
 
-    // Assemble the complete printable HTML template
-    element.innerHTML = `
-      <div style="border-bottom: 3.5px double #000000; padding-bottom: 12px; margin-bottom: 30px; text-align: center; font-family: 'Times New Roman', Times, serif;">
-        <h1 style="font-family: 'Times New Roman', Times, serif; font-weight: bold; font-size: 22pt; margin: 0 0 8px 0; color: #000000;">
-          TÀI LIỆU DỊCH THUẬT SONG NGỮ
-        </h1>
-        <div style="font-family: 'Times New Roman', Times, serif; font-size: 11pt; font-weight: bold; color: #555555; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-          <span>Sách gốc: ${title}</span>
-          <span>•</span>
-          <span>Biên dịch: ${author}</span>
-          <span>•</span>
-          <span>Ngôn ngữ: Anh - Việt</span>
+    // Assemble the complete printable HTML template as a clean string
+    const htmlString = `
+      <div style="font-family: 'Times New Roman', Times, serif; color: #111111; padding: 35px; background-color: #ffffff; width: 210mm; box-sizing: border-box; line-height: 1.6;">
+        <div style="border-bottom: 3.5px double #000000; padding-bottom: 12px; margin-bottom: 30px; text-align: center; font-family: 'Times New Roman', Times, serif;">
+          <h1 style="font-family: 'Times New Roman', Times, serif; font-weight: bold; font-size: 22pt; margin: 0 0 8px 0; color: #000000;">
+            TÀI LIỆU DỊCH THUẬT SONG NGỮ
+          </h1>
+          <div style="font-family: 'Times New Roman', Times, serif; font-size: 11pt; font-weight: bold; color: #555555; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+            <span>Sách gốc: ${title}</span>
+            <span>•</span>
+            <span>Biên dịch: ${author}</span>
+            <span>•</span>
+            <span>Ngôn ngữ: Anh - Việt</span>
+          </div>
         </div>
+        
+        <main style="margin-top: 10px; font-family: 'Times New Roman', Times, serif; height: auto;">
+          ${chaptersHtml}
+        </main>
       </div>
-      
-      <main style="margin-top: 10px; font-family: 'Times New Roman', Times, serif; height: auto;">
-        ${chaptersHtml}
-      </main>
     `;
-
-    // Append to body temporarily for rendering
-    document.body.appendChild(element);
 
     // html2pdf options
     const opt = {
       margin:       [15, 15, 15, 15], // A4 printing standard margins (top, left, bottom, right)
       filename:     `${title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2.2, useCORS: true, letterRendering: true },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] },
+      html2canvas:  { scale: 1.5, useCORS: true, letterRendering: true }, // Scale 1.5 is safe for large documents, crisp and memory-safe
+      pagebreak:    { mode: ['css', 'legacy'] }, // Respect original CSS/legacy styles, avoids 'avoid-all' blank page loops
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    // Render & Trigger direct browser download
-    await html2pdf().from(element).set(opt).save();
-
-    // Clean up temporary DOM element
-    document.body.removeChild(element);
+    // Render & Trigger direct browser download from the HTML string inside the sandboxed renderer
+    await html2pdf().from(htmlString).set(opt).save();
 
   } catch (err: any) {
     console.error('Lỗi xuất PDF trực tiếp: ', err);

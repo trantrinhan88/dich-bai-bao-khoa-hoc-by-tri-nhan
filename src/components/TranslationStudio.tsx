@@ -15,6 +15,7 @@ interface ITranslationBlock {
   maxY?: number;
   type?: 'header' | 'footer' | 'title' | 'body' | 'small';
   shouldTranslate?: boolean;
+  skipDisplay?: boolean;
 }
 
 // Function to dynamically load PDF.js from CDN
@@ -36,28 +37,84 @@ const loadPdfJS = (): Promise<any> => {
   });
 };
 
-// API helper to translate text using free Google Translate web API
-async function translateText(text: string): Promise<string> {
-  if (!text.trim()) return '';
-  try {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(text)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Yêu cầu dịch thuật bị từ chối');
-    const data = await res.json();
-    
-    if (data && data[0]) {
-      return data[0].map((segment: any) => segment[0] || '').join('');
-    }
-    return '[Không nhận được bản dịch]';
-  } catch (err) {
-    console.error('Lỗi dịch thuật: ', err);
-    return '[Lỗi chuyển ngữ AI]';
+// Standalone API helper for Gemini 2.5 Flash Lite Free
+async function translateWithGemini(text: string, apiKey: string): Promise<string> {
+  if (!apiKey.trim()) throw new Error('Vui lòng nhập API Key cho Gemini!');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: `Translate the following English academic/scientific text into professional, accurate Vietnamese. 
+Preserve all formatting, math notations, symbols, and academic terms exactly as they are.
+Return ONLY the translated Vietnamese text, with absolutely no preamble, intro, explanation, markdown blocks, or surrounding quotes:
+
+${text}`
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.1,
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || `Lỗi kết nối Gemini API (HTTP ${response.status})`);
   }
+
+  const data = await response.json();
+  const resultText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!resultText) throw new Error('Không nhận được phản hồi từ Gemini API');
+  return resultText.trim();
+}
+
+// Standalone API helper for DeepSeek v4 Pro
+async function translateWithDeepseek(text: string, apiKey: string): Promise<string> {
+  if (!apiKey.trim()) throw new Error('Vui lòng nhập API Key cho DeepSeek!');
+  const url = 'https://api.deepseek.com/chat/completions';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional academic translator specializing in scientific and technical papers. Translate the English input into high-quality, professional Vietnamese. Keep formulas, math notations, original formatting, and layout styles intact. Do not add any explanation, introductory remarks, markdown code blocks, or extra text. Output ONLY the translated Vietnamese text.'
+        },
+        {
+          role: 'user',
+          content: text
+        }
+      ],
+      temperature: 0.1
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || `Lỗi kết nối DeepSeek API (HTTP ${response.status})`);
+  }
+
+  const data = await response.json();
+  const resultText = data?.choices?.[0]?.message?.content;
+  if (!resultText) throw new Error('Không nhận được phản hồi từ DeepSeek API');
+  return resultText.trim();
 }
 
 // Helper to clean up PDF diacritic spacing bugs (e.g. "tuầ n" -> "tuần", "mấ t" -> "mất")
 function cleanVietnameseDiacritics(text: string): string {
-  return text.replace(/([aăâeêoôơuưyáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵđ])\s([ntucgimyoa]{1,2}\b)/gi, '$1$2');
+  const vietnameseChars = 'a-zA-Z0-9ăâêôơưĂÂÊÔƠƯàáảãạằắẳẵặầấẩẫậềếểễệòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵđĐ';
+  const regex = new RegExp(`([aăâeêoôơuưyáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵđ])\\s([ntucgimyoah]{1,2})(?![${vietnameseChars}])`, 'gi');
+  return text.replace(regex, '$1$2');
 }
 
 export default function TranslationStudio() {
@@ -68,6 +125,9 @@ export default function TranslationStudio() {
   // Options
   const [layoutStyle, setLayoutStyle] = useState<'bilingual' | 'multicolumn' | 'plain'>('bilingual');
   const [exportFormat, setExportFormat] = useState<'both' | 'pdf' | 'epub'>('both');
+  const [selectedModel, setSelectedModel] = useState<'google' | 'gemini' | 'deepseek'>('google');
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [deepseekApiKey, setDeepseekApiKey] = useState('');
 
   // Translation stats
   const [progress, setProgress] = useState(0);
@@ -77,6 +137,45 @@ export default function TranslationStudio() {
   const [currentPage, setCurrentPage] = useState(0);
   
   const blocksEndRef = useRef<HTMLDivElement>(null);
+
+  // Load API keys and Model from localStorage on mount
+  useEffect(() => {
+    const savedModel = localStorage.getItem('selected_model');
+    const savedGeminiKey = localStorage.getItem('gemini_api_key');
+    const savedDeepseekKey = localStorage.getItem('deepseek_api_key');
+    if (savedModel) setSelectedModel(savedModel as any);
+    if (savedGeminiKey) setGeminiApiKey(savedGeminiKey);
+    if (savedDeepseekKey) setDeepseekApiKey(savedDeepseekKey);
+  }, []);
+
+  // Dynamic state-linked translation helper inside component
+  const translateText = async (text: string): Promise<string> => {
+    if (!text.trim()) return '';
+    try {
+      if (selectedModel === 'google') {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(text)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Yêu cầu dịch thuật bị từ chối');
+        const data = await res.json();
+        
+        if (data && data[0]) {
+          const rawResult = data[0].map((segment: any) => segment[0] || '').join('');
+          return cleanVietnameseDiacritics(rawResult);
+        }
+        return '[Không nhận được bản dịch]';
+      } else if (selectedModel === 'gemini') {
+        const rawResult = await translateWithGemini(text, geminiApiKey);
+        return cleanVietnameseDiacritics(rawResult);
+      } else if (selectedModel === 'deepseek') {
+        const rawResult = await translateWithDeepseek(text, deepseekApiKey);
+        return cleanVietnameseDiacritics(rawResult);
+      }
+      return '[Mô hình không hợp lệ]';
+    } catch (err: any) {
+      console.error('Lỗi dịch thuật: ', err);
+      return `[Lỗi chuyển ngữ AI: ${err.message || 'Unknown error'}]`;
+    }
+  };
 
   // Scroll to bottom when blocks update during active translation
   useEffect(() => {
@@ -119,6 +218,15 @@ export default function TranslationStudio() {
   // Start Parsing & Sequential Translation
   const startTranslationProcess = async () => {
     if (!file) return;
+
+    if (selectedModel === 'gemini' && !geminiApiKey.trim()) {
+      alert('Vui lòng nhập API Key cho Gemini để bắt đầu dịch!');
+      return;
+    }
+    if (selectedModel === 'deepseek' && !deepseekApiKey.trim()) {
+      alert('Vui lòng nhập API Key cho DeepSeek để bắt đầu dịch!');
+      return;
+    }
 
     try {
       setPhase('parsing');
@@ -175,17 +283,50 @@ export default function TranslationStudio() {
           return true;
         });
 
-        // 2. Thuật toán phân luồng Cột (Column-Aware Coordinate Sorting)
-        const mid = pageWidth / 2;
-        const leftBound = mid - 15;
-        const rightBound = mid + 15;
+        // 2. Thuật toán phân luồng Cột động (Dynamic Column-Aware Coordinate Sorting)
+        let splitX = pageWidth / 2;
+        let isTwoColumn = false;
+        let minCrossCount = Infinity;
+        let bestLeftCount = 0;
+        let bestRightCount = 0;
 
-        // Phân loại các khối chữ theo vị trí địa lý trên trang
-        const leftHalfItems = validItems.filter((item: any) => item.transform[4] + (item.width || 0) < mid);
-        const rightHalfItems = validItems.filter((item: any) => item.transform[4] > mid);
+        const startX = Math.round(pageWidth * 0.2);
+        const endX = Math.round(pageWidth * 0.6);
 
-        // Ngưỡng phát hiện trang song cột: cột bên phải phải có số lượng khối chữ đáng kể
-        const isTwoColumn = rightHalfItems.length > 3 && (rightHalfItems.length / validItems.length) > 0.08;
+        // Quét tìm vạch phân chia tối ưu từ 20% đến 60% chiều rộng trang
+        for (let x_c = startX; x_c <= endX; x_c += 5) {
+          let leftCount = 0;
+          let rightCount = 0;
+          let crossCount = 0;
+
+          validItems.forEach((item: any) => {
+            const x = item.transform[4];
+            const w = item.width || 0;
+            if (x + w < x_c) {
+              leftCount++;
+            } else if (x > x_c) {
+              rightCount++;
+            } else {
+              crossCount++;
+            }
+          });
+
+          // Tìm vạch cắt ngang ít phần tử nhất, hai bên đều phải có số lượng phần tử chữ tối thiểu
+          if (leftCount > 3 && rightCount > 3) {
+            if (crossCount < minCrossCount) {
+              minCrossCount = crossCount;
+              splitX = x_c;
+              bestLeftCount = leftCount;
+              bestRightCount = rightCount;
+              isTwoColumn = true;
+            }
+          }
+        }
+
+        // Nếu số lượng khối cắt qua vạch chia quá lớn so với các cột, coi là trang đơn cột thường
+        if (isTwoColumn && minCrossCount > (bestLeftCount + bestRightCount) * 0.25) {
+          isTwoColumn = false;
+        }
 
         let finalItems: any[] = [];
 
@@ -202,7 +343,7 @@ export default function TranslationStudio() {
             return yB - yA;
           });
         } else {
-          // Trang song cột: Áp dụng thuật toán phân luồng đọc cột học thuật
+          // Trang song cột (hoặc lề hẹp bên trái): Tách biệt các cột để tránh trộn lẫn chữ
           const leftColItems: any[] = [];
           const rightColItems: any[] = [];
           const fullWidthItems: any[] = [];
@@ -210,16 +351,16 @@ export default function TranslationStudio() {
           validItems.forEach((item: any) => {
             const x = item.transform[4];
             const w = item.width || 0;
-            if (x < leftBound && (x + w) > rightBound) {
-              fullWidthItems.push(item);
-            } else if (x + w < rightBound) {
+            if (x + w < splitX) {
               leftColItems.push(item);
-            } else {
+            } else if (x > splitX) {
               rightColItems.push(item);
+            } else {
+              fullWidthItems.push(item);
             }
           });
 
-          // Xác định vùng hai cột để phân chia luồng đọc
+          // Xác định vùng hai cột để phân chia luồng đọc đứng
           let highestTwoColY = 0;
           let lowestTwoColY = pageHeight;
 
@@ -229,7 +370,7 @@ export default function TranslationStudio() {
             if (y < lowestTwoColY) lowestTwoColY = y;
           });
 
-          // Tách các khối chữ thành 3 vùng đứng: Trên hai cột, Giữa hai cột, Dưới hai cột
+          // Phân tách các khối chữ thành 5 phân vùng tuyến tính để ghép thành luồng đọc chuẩn
           const topFullItems: any[] = [];
           const bottomFullItems: any[] = [];
           const midFullItems: any[] = [];
@@ -246,18 +387,18 @@ export default function TranslationStudio() {
             } else if (y < lowestTwoColY) {
               bottomFullItems.push(item);
             } else {
-              // Vùng ở giữa
-              if (x < leftBound && (x + w) > rightBound) {
-                midFullItems.push(item);
-              } else if (x + w < rightBound) {
+              // Vùng song song ở giữa trang
+              if (x + w < splitX) {
                 leftColumn.push(item);
-              } else {
+              } else if (x > splitX) {
                 rightColumn.push(item);
+              } else {
+                midFullItems.push(item);
               }
             }
           });
 
-          // Định nghĩa bộ so sánh sắp xếp (y giảm dần, x tăng dần)
+          // Bộ so sánh tọa độ dòng (y giảm dần từ trên xuống, x tăng dần từ trái qua)
           const coordinateComparator = (a: any, b: any) => {
             const yA = a.transform[5];
             const yB = b.transform[5];
@@ -269,14 +410,14 @@ export default function TranslationStudio() {
             return yB - yA;
           };
 
-          // Sắp xếp từng phân vùng
+          // Sắp xếp riêng biệt từng phần
           topFullItems.sort(coordinateComparator);
           leftColumn.sort(coordinateComparator);
           rightColumn.sort(coordinateComparator);
           midFullItems.sort(coordinateComparator);
           bottomFullItems.sort(coordinateComparator);
 
-          // Lắp ghép tuần tự luồng đọc học thuật
+          // Lắp ráp luồng đọc học thuật đúng trật tự: trên trước, trái trước, phải sau, rồi dưới
           finalItems = [
             ...topFullItems,
             ...leftColumn,
@@ -410,6 +551,34 @@ export default function TranslationStudio() {
       // 6. Phân loại và tạo danh sách khối dịch cuối cùng
       const extractedBlocks: ITranslationBlock[] = [];
 
+      // Định nghĩa bộ lọc nhiễu lề biên và metadata học thuật
+      const isAcademicNoiseBlock = (text: string): boolean => {
+        const s = text.trim();
+        if (!s) return true;
+
+        const noiseRegexes = [
+          /how\s+to\s+cite\s+this\s+paper/i,
+          /received:\s+\w+\s+\d+/i,
+          /accepted:\s+\w+\s+\d+/i,
+          /published:\s+\w+\s+\d+/i,
+          /copyright\s+©/i,
+          /scientific\s+research\s+publishing/i,
+          /open\s+access/i,
+          /creativecommons\.org\/licenses/i,
+          /doi\.org\/10\./i,
+          /issn\s+online/i,
+          /issn\s+print/i,
+          /journal\s+of\s+diabetes\s+mellitus/i,
+          /https?:\/\/(www\.)?scirp\.org\/journal/i,
+          /^doi:\s*10\.\d{4}/i,
+          /^\d+$/i,                        // Số trang đơn lẻ
+          /^\d+\s*-\s*\d+$/i,              // Dải số trang (e.g. 76-81)
+          /^\d+\s*of\s*\d+$/i              // (e.g. 76 of 81)
+        ];
+
+        return noiseRegexes.some(regex => regex.test(s));
+      };
+
       allRawBlocks.forEach(block => {
         const pHeight = pageHeightsMap[block.page] || 842;
         const yTop = block.maxY;
@@ -418,6 +587,8 @@ export default function TranslationStudio() {
         // Ngưỡng lề biên cho header và footer
         const isHeader = yTop > pHeight - 60;
         const isFooter = yBottom < 60;
+        const isNoise = isAcademicNoiseBlock(block.en);
+        const skipDisplay = isHeader || isFooter || isNoise;
 
         let type: 'header' | 'footer' | 'title' | 'body' | 'small' = 'body';
         let shouldTranslate = true;
@@ -427,6 +598,9 @@ export default function TranslationStudio() {
           shouldTranslate = false;
         } else if (isFooter) {
           type = 'footer';
+          shouldTranslate = false;
+        } else if (isNoise) {
+          type = 'small';
           shouldTranslate = false;
         } else if (block.page === 1 && block.fontSize >= maxFontSize - 1.5 && block.fontSize > 13) {
           type = 'title';
@@ -449,7 +623,8 @@ export default function TranslationStudio() {
             minY: block.minY,
             maxY: block.maxY,
             type: type,
-            shouldTranslate: false
+            shouldTranslate: false,
+            skipDisplay: skipDisplay
           });
         } else {
           // Khối cần dịch (Tiêu đề lớn nhất, nội dung bài khoa học dài)
@@ -468,7 +643,8 @@ export default function TranslationStudio() {
                   minY: block.minY,
                   maxY: block.maxY,
                   type: type,
-                  shouldTranslate: true
+                  shouldTranslate: true,
+                  skipDisplay: false
                 });
               }
             });
@@ -483,7 +659,8 @@ export default function TranslationStudio() {
               minY: block.minY,
               maxY: block.maxY,
               type: type,
-              shouldTranslate: true
+              shouldTranslate: true,
+              skipDisplay: false
             });
           }
         }
@@ -570,6 +747,7 @@ export default function TranslationStudio() {
 
       if (layoutStyle === 'bilingual') {
         pageBlocks.forEach((b) => {
+          if (b.skipDisplay) return; // Bỏ qua khối lề biên học thuật
           if (b.shouldTranslate === false) {
             // Header/Footer hoặc trích dẫn giữ nguyên gốc 1 lần
             if (b.type === 'header' || b.type === 'footer') {
@@ -595,6 +773,7 @@ export default function TranslationStudio() {
         // Plain translated Vietnamese
         let currentParagraphParts: string[] = [];
         pageBlocks.forEach((b, idx) => {
+          if (b.skipDisplay) return; // Bỏ qua khối lề biên học thuật
           if (b.shouldTranslate === false) {
             // Xả các câu trước đó ra trước
             if (currentParagraphParts.length > 0) {
@@ -661,6 +840,7 @@ export default function TranslationStudio() {
 
       if (layoutStyle === 'bilingual') {
         pageBlocks.forEach((b) => {
+          if (b.skipDisplay) return; // Bỏ qua khối lề biên học thuật
           if (b.shouldTranslate === false) {
             if (b.type === 'header' || b.type === 'footer') {
               pagesMap[pageNum].push(`<div style="text-align: center; font-size: 10pt; color: #555555; font-family: Arial, sans-serif; margin: 8pt 0; text-indent: 0;">${b.en}</div>`);
@@ -685,6 +865,7 @@ export default function TranslationStudio() {
         // Plain translated Vietnamese
         let currentParagraphParts: string[] = [];
         pageBlocks.forEach((b, idx) => {
+          if (b.skipDisplay) return; // Bỏ qua khối lề biên học thuật
           if (b.shouldTranslate === false) {
             if (currentParagraphParts.length > 0) {
               pagesMap[pageNum].push(currentParagraphParts.join(' '));
@@ -802,7 +983,7 @@ export default function TranslationStudio() {
                 ⚙️ CẤU HÌNH DỊCH THUẬT &amp; XUẤT BẢN THỰC TẾ
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Option 1: Translation layout style */}
                 <div className="space-y-2">
                   <span className="text-xs font-black uppercase text-neutral-800 block">
@@ -832,10 +1013,58 @@ export default function TranslationStudio() {
                   </div>
                 </div>
 
-                {/* Option 2: Export formats */}
+                {/* Option 2: Translation model selection */}
                 <div className="space-y-2">
                   <span className="text-xs font-black uppercase text-neutral-800 block">
-                    2. Định dạng xuất bản mong muốn
+                    2. Mô hình dịch thuật AI
+                  </span>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="selectedModel"
+                        checked={selectedModel === 'google'}
+                        onChange={() => {
+                          setSelectedModel('google');
+                          localStorage.setItem('selected_model', 'google');
+                        }}
+                        className="accent-black w-4 h-4"
+                      />
+                      Google Translate (Mặc định - Free)
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="selectedModel"
+                        checked={selectedModel === 'gemini'}
+                        onChange={() => {
+                          setSelectedModel('gemini');
+                          localStorage.setItem('selected_model', 'gemini');
+                        }}
+                        className="accent-black w-4 h-4"
+                      />
+                      Gemini 2.5 Flash Lite Free (API)
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="selectedModel"
+                        checked={selectedModel === 'deepseek'}
+                        onChange={() => {
+                          setSelectedModel('deepseek');
+                          localStorage.setItem('selected_model', 'deepseek');
+                        }}
+                        className="accent-black w-4 h-4"
+                      />
+                      DeepSeek v4 Pro (API)
+                    </label>
+                  </div>
+                </div>
+
+                {/* Option 3: Export formats */}
+                <div className="space-y-2">
+                  <span className="text-xs font-black uppercase text-neutral-800 block">
+                    3. Định dạng xuất bản
                   </span>
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
@@ -871,6 +1100,51 @@ export default function TranslationStudio() {
                   </div>
                 </div>
               </div>
+
+              {/* API Key Inputs (Conditional) */}
+              {selectedModel === 'gemini' && (
+                <div className="space-y-2 pt-3 border-t border-neutral-300 animate-fadeIn">
+                  <label htmlFor="gemini-key-input" className="text-xs font-black uppercase text-neutral-800 block">
+                    🔑 Nhập Google Gemini API Key
+                  </label>
+                  <input
+                    id="gemini-key-input"
+                    type="password"
+                    value={geminiApiKey}
+                    onChange={(e) => {
+                      setGeminiApiKey(e.target.value);
+                      localStorage.setItem('gemini_api_key', e.target.value);
+                    }}
+                    placeholder="AIzaSy..."
+                    className="w-full text-xs font-bold p-2.5 border-2 border-black rounded-sm bg-white focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
+                    Lấy key miễn phí tại Google AI Studio. Key được lưu cục bộ trên trình duyệt của bạn.
+                  </p>
+                </div>
+              )}
+
+              {selectedModel === 'deepseek' && (
+                <div className="space-y-2 pt-3 border-t border-neutral-300 animate-fadeIn">
+                  <label htmlFor="deepseek-key-input" className="text-xs font-black uppercase text-neutral-800 block">
+                    🔑 Nhập DeepSeek API Key
+                  </label>
+                  <input
+                    id="deepseek-key-input"
+                    type="password"
+                    value={deepseekApiKey}
+                    onChange={(e) => {
+                      setDeepseekApiKey(e.target.value);
+                      localStorage.setItem('deepseek_api_key', e.target.value);
+                    }}
+                    placeholder="sk-..."
+                    className="w-full text-xs font-bold p-2.5 border-2 border-black rounded-sm bg-white focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
+                    Lấy key tại platform.deepseek.com. Key được lưu cục bộ trên trình duyệt của bạn.
+                  </p>
+                </div>
+              )}
 
               {/* Start Button */}
               <button
@@ -928,7 +1202,11 @@ export default function TranslationStudio() {
                   let typeBadgeColor = "bg-emerald-100 text-emerald-850 border-emerald-200";
                   let blockStyle = "";
                   
-                  if (block.type === 'header') {
+                  if (block.skipDisplay) {
+                    typeLabel = "Lề biên học thuật - Đã ẩn";
+                    typeBadgeColor = "bg-neutral-200 text-neutral-500 border-neutral-300 font-normal";
+                    blockStyle = "bg-neutral-100/50 border-neutral-200 opacity-60";
+                  } else if (block.type === 'header') {
                     typeLabel = "Header Lề trên - Giữ nguyên";
                     typeBadgeColor = "bg-neutral-200 text-neutral-700 border-neutral-350";
                     blockStyle = "bg-neutral-50/50 border-neutral-200";
@@ -980,13 +1258,15 @@ export default function TranslationStudio() {
                       }`}>
                         <div className="flex justify-between items-center mb-1">
                           <span className={`text-[9px] px-1.5 py-0.5 rounded font-sans font-black uppercase tracking-wider ${
-                            isBypassed 
+                            block.skipDisplay
+                              ? 'bg-neutral-200 text-neutral-500'
+                              : isBypassed 
                               ? 'bg-neutral-200 text-neutral-600' 
                               : isTranslating 
                               ? 'bg-amber-100 text-amber-800 animate-pulse' 
                               : 'bg-emerald-100 text-emerald-800'
                           }`}>
-                            {isBypassed ? "Không dịch (English gốc)" : "Bản dịch VI"}
+                            {block.skipDisplay ? "Đã ẩn ở bản dịch" : isBypassed ? "Không dịch (English gốc)" : "Bản dịch VI"}
                           </span>
                         </div>
 
@@ -1010,7 +1290,9 @@ export default function TranslationStudio() {
 
                         {isDone && (
                           <p className={`font-sans leading-relaxed pt-1 animate-fadeIn ${
-                            block.type === 'title' 
+                            block.skipDisplay
+                              ? 'text-neutral-400 italic text-[11px]'
+                              : block.type === 'title' 
                               ? 'text-xs font-black uppercase text-rose-950' 
                               : block.type === 'small' || block.type === 'header' || block.type === 'footer'
                               ? 'text-xs text-neutral-600 italic'
@@ -1018,7 +1300,7 @@ export default function TranslationStudio() {
                               ? 'text-xs font-extrabold text-neutral-900' 
                               : 'text-xs text-emerald-950 font-semibold'
                           }`}>
-                            {block.vi}
+                            {block.skipDisplay ? "[Dòng này là nhiễu lề biên / số trang / copyright - Đã loại bỏ hoàn toàn khỏi bản dịch]" : block.vi}
                           </p>
                         )}
                       </div>
@@ -1126,6 +1408,7 @@ export default function TranslationStudio() {
               <div className="space-y-4 text-sm leading-relaxed text-[#111111] text-justify">
                 {layoutStyle === 'bilingual' ? (
                   blocks.slice(0, 15).map((b: any, idx) => {
+                    if (b.skipDisplay) return null; // Bỏ qua lề biên học thuật
                     if (b.shouldTranslate === false) {
                       if (b.type === 'header' || b.type === 'footer') {
                         return (
@@ -1168,6 +1451,7 @@ export default function TranslationStudio() {
                   })
                 ) : (
                   blocks.slice(0, 15).map((b: any, idx) => {
+                    if (b.skipDisplay) return null; // Bỏ qua lề biên học thuật
                     if (b.shouldTranslate === false) {
                       if (b.type === 'header' || b.type === 'footer') {
                         return (
