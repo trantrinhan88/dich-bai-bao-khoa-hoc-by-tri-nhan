@@ -918,27 +918,31 @@ export default function TranslationStudio() {
   };
 
   return (
-    <div className="bg-[#fcfbf7] border-4 border-black p-6 sm:p-8 rounded-lg shadow-md max-w-4xl mx-auto text-[#111111] font-sans">
+    <div className="glass-panel shadow-apple-product rounded-3xl p-6 sm:p-10 max-w-4xl mx-auto text-[#1d1d1f] font-sans relative z-10 overflow-hidden">
       
+      {/* Brand Ambient Glow internal effects */}
+      <div className="absolute top-0 right-0 w-[300px] h-[300px] rounded-full bg-purple-500/5 blur-[80px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full bg-blue-500/5 blur-[80px] pointer-events-none" />
+
       {/* Header section */}
-      <div className="border-b-4 border-black pb-4 mb-6 flex flex-col sm:flex-row justify-between items-baseline gap-2">
-        <div>
-          <h2 className="text-[32px] font-sans font-black tracking-tight" style={{ fontSize: '32px' }}>
-            Dịch bài báo khoa hoc- Tác giả: Trần Trí Nhân
+      <div className="border-b border-black/[0.06] pb-6 mb-8 flex flex-col sm:flex-row justify-between items-baseline gap-4 relative z-10">
+        <div className="space-y-1">
+          <h2 className="font-apple-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#1d1d1f] leading-tight">
+            Dịch bài báo khoa học • <span className="iphone-gradient-text">Trần Trí Nhân</span>
           </h2>
-          <p className="text-xs font-sans font-bold text-neutral-600 uppercase tracking-widest mt-1">
-            Dịch thuật PDF song ngữ chuẩn xác • Xuất bản PDF/EPUB thời gian thực
+          <p className="text-xs sm:text-[13px] font-sans font-medium text-neutral-500 tracking-tight leading-normal">
+            Dịch thuật PDF song ngữ chuẩn xác • Chế bản PDF/EPUB thời gian thực
           </p>
         </div>
-        <span className="text-xs bg-red-700 text-white font-sans font-extrabold uppercase px-2.5 py-1 rounded-sm">
+        <span className="text-[10px] bg-gradient-to-r from-[#0066cc] to-[#ff2e93] text-white font-sans font-bold uppercase px-3.5 py-1 rounded-full shadow-sm shadow-blue-500/20 select-none animate-pulseGlow shrink-0">
           REAL PDF PARSER
         </span>
       </div>
 
       {phase === 'upload' && (
-        <div className="space-y-6 animate-fadeIn">
-          <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-semibold">
-            Tải lên tệp tài liệu nghiên cứu khoa học bằng tiếng Anh định dạng PDF. Hệ thống dịch thuật AI sẽ **trích xuất văn bản thực tế** từ bên trong tệp tin của bạn, dịch chuyển ngữ song hành từng dòng bằng Google Translate API và đóng gói chuẩn e-book PDF/EPUB.
+        <div className="space-y-8 animate-fadeIn relative z-10">
+          <p className="text-sm sm:text-[15px] text-neutral-600 leading-relaxed font-normal">
+            Tải lên tệp tài liệu nghiên cứu khoa học bằng tiếng Anh định dạng PDF. Hệ thống dịch thuật AI sẽ <strong>trích xuất văn bản thực tế</strong> từ bên trong tệp tin của bạn, dịch chuyển ngữ song hành từng dòng bằng Google Translate API và đóng gói chuẩn e-book PDF/EPUB.
           </p>
 
           {/* Drag and Drop Zone */}
@@ -946,12 +950,15 @@ export default function TranslationStudio() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`border-4 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-300 ${
+            className={`relative group overflow-hidden border-2 border-dashed rounded-3xl p-10 text-center cursor-pointer transition-all duration-300 ${
               isDragOver 
-                ? 'border-emerald-500 bg-emerald-50/50 shadow-inner' 
-                : 'border-neutral-400 hover:border-black hover:bg-neutral-50/50'
+                ? 'border-[#0066cc] bg-[#0066cc]/5 scale-[1.01] shadow-lg shadow-[#0066cc]/10' 
+                : 'border-neutral-300 bg-white/40 hover:border-neutral-400 hover:bg-white/60 shadow-sm'
             }`}
           >
+            {/* Glowing gradient background border effect on hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0066cc]/0 via-[#862e9c]/0 to-[#ff2e93]/0 group-hover:from-[#0066cc]/3 group-hover:via-[#862e9c]/3 group-hover:to-[#ff2e93]/3 transition-all duration-500 pointer-events-none" />
+
             <input
               type="file"
               accept=".pdf"
@@ -960,16 +967,16 @@ export default function TranslationStudio() {
               className="hidden"
             />
             <label htmlFor="file-upload-input" className="cursor-pointer space-y-4 block">
-              <div className="w-16 h-16 bg-neutral-200 border-2 border-black rounded-full flex items-center justify-center mx-auto hover:scale-105 active:scale-95 transition-all">
-                <svg className="w-8 h-8 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              <div className="w-16 h-16 bg-white shadow-sm hover:shadow border border-black/[0.04] rounded-full flex items-center justify-center mx-auto hover:scale-105 active:scale-95 transition-all duration-200">
+                <svg className="w-8 h-8 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-black uppercase tracking-tight text-neutral-800">
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold tracking-tight text-neutral-800 uppercase">
                   {file ? file.name : "KÉO & THẢ FILE PDF CỦA BẠN VÀO ĐÂY"}
                 </p>
-                <p className="text-xs text-neutral-500 font-bold uppercase tracking-wider">
+                <p className="text-xs text-neutral-400 font-medium uppercase tracking-wider">
                   {file ? `Dung lượng: ${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Hoặc click để chọn file từ máy tính"}
                 </p>
               </div>
@@ -978,133 +985,141 @@ export default function TranslationStudio() {
 
           {/* Translation Options Panel */}
           {file && (
-            <div className="bg-[#f5f2eb] border-2 border-black p-5 rounded-md space-y-5">
-              <h3 className="text-xs font-black uppercase tracking-wider border-b border-neutral-300 pb-2">
-                ⚙️ CẤU HÌNH DỊCH THUẬT &amp; XUẤT BẢN THỰC TẾ
+            <div className="bg-white/50 border border-black/[0.05] p-6 rounded-2xl space-y-6 shadow-sm animate-fadeIn">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 border-b border-black/[0.04] pb-3 flex items-center gap-1.5">
+                <span>⚙️</span> CẤU HÌNH DỊCH THUẬT &amp; XUẤT BẢN THỰC TẾ
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Option 1: Translation layout style */}
-                <div className="space-y-2">
-                  <span className="text-xs font-black uppercase text-neutral-800 block">
+                <div className="space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wide text-neutral-600 block">
                     1. Kiểu trình bày bản dịch
                   </span>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="layoutStyle"
-                        checked={layoutStyle === 'bilingual'}
-                        onChange={() => setLayoutStyle('bilingual')}
-                        className="accent-black w-4 h-4"
-                      />
-                      Dịch song ngữ từng câu (1 đoạn Anh - 1 đoạn Việt)
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="layoutStyle"
-                        checked={layoutStyle === 'plain'}
-                        onChange={() => setLayoutStyle('plain')}
-                        className="accent-black w-4 h-4"
-                      />
-                      Bản dịch trơn tiếng Việt
-                    </label>
+                  <div className="flex bg-neutral-200/50 p-1 rounded-full border border-black/[0.04] w-full">
+                    <button
+                      type="button"
+                      onClick={() => setLayoutStyle('bilingual')}
+                      className={`flex-1 py-2 text-[11px] font-sans font-bold uppercase tracking-wider rounded-full text-center transition-all apple-button-transition ${
+                        layoutStyle === 'bilingual'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      Bản song ngữ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLayoutStyle('plain')}
+                      className={`flex-1 py-2 text-[11px] font-sans font-bold uppercase tracking-wider rounded-full text-center transition-all apple-button-transition ${
+                        layoutStyle === 'plain'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      Bản dịch trơn
+                    </button>
                   </div>
                 </div>
 
                 {/* Option 2: Translation model selection */}
-                <div className="space-y-2">
-                  <span className="text-xs font-black uppercase text-neutral-800 block">
+                <div className="space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wide text-neutral-600 block">
                     2. Mô hình dịch thuật AI
                   </span>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="selectedModel"
-                        checked={selectedModel === 'google'}
-                        onChange={() => {
-                          setSelectedModel('google');
-                          localStorage.setItem('selected_model', 'google');
-                        }}
-                        className="accent-black w-4 h-4"
-                      />
-                      Google Translate (Mặc định - Free)
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="selectedModel"
-                        checked={selectedModel === 'gemini'}
-                        onChange={() => {
-                          setSelectedModel('gemini');
-                          localStorage.setItem('selected_model', 'gemini');
-                        }}
-                        className="accent-black w-4 h-4"
-                      />
-                      Gemini 2.5 Flash Lite Free (API)
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="selectedModel"
-                        checked={selectedModel === 'deepseek'}
-                        onChange={() => {
-                          setSelectedModel('deepseek');
-                          localStorage.setItem('selected_model', 'deepseek');
-                        }}
-                        className="accent-black w-4 h-4"
-                      />
-                      DeepSeek v4 Pro (API)
-                    </label>
+                  <div className="flex flex-col gap-1 bg-neutral-200/50 p-1 rounded-2xl border border-black/[0.04] w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedModel('google');
+                        localStorage.setItem('selected_model', 'google');
+                      }}
+                      className={`w-full py-1.5 text-[11px] font-sans font-bold uppercase tracking-wider rounded-xl text-center transition-all apple-button-transition ${
+                        selectedModel === 'google'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      Google Translate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedModel('gemini');
+                        localStorage.setItem('selected_model', 'gemini');
+                      }}
+                      className={`w-full py-1.5 text-[11px] font-sans font-bold uppercase tracking-wider rounded-xl text-center transition-all apple-button-transition ${
+                        selectedModel === 'gemini'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      Gemini 2.5 Lite
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedModel('deepseek');
+                        localStorage.setItem('selected_model', 'deepseek');
+                      }}
+                      className={`w-full py-1.5 text-[11px] font-sans font-bold uppercase tracking-wider rounded-xl text-center transition-all apple-button-transition ${
+                        selectedModel === 'deepseek'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      DeepSeek v4 Pro
+                    </button>
                   </div>
                 </div>
 
                 {/* Option 3: Export formats */}
-                <div className="space-y-2">
-                  <span className="text-xs font-black uppercase text-neutral-800 block">
+                <div className="space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wide text-neutral-600 block">
                     3. Định dạng xuất bản
                   </span>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="exportFormat"
-                        checked={exportFormat === 'both'}
-                        onChange={() => setExportFormat('both')}
-                        className="accent-black w-4 h-4"
-                      />
-                      Cả PDF (Bản in) &amp; EPUB (Kindle/Di động)
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="exportFormat"
-                        checked={exportFormat === 'pdf'}
-                        onChange={() => setExportFormat('pdf')}
-                        className="accent-black w-4 h-4"
-                      />
-                      Chỉ xuất bản tệp tin PDF (.pdf)
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-bold text-neutral-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="exportFormat"
-                        checked={exportFormat === 'epub'}
-                        onChange={() => setExportFormat('epub')}
-                        className="accent-black w-4 h-4"
-                      />
-                      Chỉ xuất bản sách điện tử EPUB (.epub)
-                    </label>
+                  <div className="flex flex-col gap-1 bg-neutral-200/50 p-1 rounded-2xl border border-black/[0.04] w-full">
+                    <button
+                      type="button"
+                      onClick={() => setExportFormat('both')}
+                      className={`w-full py-1.5 text-[11px] font-sans font-bold uppercase tracking-wider rounded-xl text-center transition-all apple-button-transition ${
+                        exportFormat === 'both'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      PDF &amp; EPUB Cả hai
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExportFormat('pdf')}
+                      className={`w-full py-1.5 text-[11px] font-sans font-bold uppercase tracking-wider rounded-xl text-center transition-all apple-button-transition ${
+                        exportFormat === 'pdf'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      Chỉ xuất PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExportFormat('epub')}
+                      className={`w-full py-1.5 text-[11px] font-sans font-bold uppercase tracking-wider rounded-xl text-center transition-all apple-button-transition ${
+                        exportFormat === 'epub'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-neutral-500 hover:text-black'
+                      }`}
+                    >
+                      Chỉ xuất EPUB
+                    </button>
                   </div>
                 </div>
               </div>
 
               {/* API Key Inputs (Conditional) */}
               {selectedModel === 'gemini' && (
-                <div className="space-y-2 pt-3 border-t border-neutral-300 animate-fadeIn">
-                  <label htmlFor="gemini-key-input" className="text-xs font-black uppercase text-neutral-800 block">
+                <div className="space-y-2 pt-4 border-t border-black/[0.04] animate-fadeIn">
+                  <label htmlFor="gemini-key-input" className="text-xs font-bold uppercase text-neutral-600 block">
                     🔑 Nhập Google Gemini API Key
                   </label>
                   <input
@@ -1116,17 +1131,17 @@ export default function TranslationStudio() {
                       localStorage.setItem('gemini_api_key', e.target.value);
                     }}
                     placeholder="AIzaSy..."
-                    className="w-full text-xs font-bold p-2.5 border-2 border-black rounded-sm bg-white focus:outline-none focus:ring-1 focus:ring-black"
+                    className="w-full text-xs font-semibold p-3 border border-black/10 rounded-full bg-white/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/30 focus:border-[#0066cc] shadow-inner transition-all duration-200"
                   />
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                    Lấy key miễn phí tại Google AI Studio. Key được lưu cục bộ trên trình duyệt của bạn.
+                  <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider pl-1.5">
+                    Lấy key miễn phí tại Google AI Studio. Key được lưu cục bộ an toàn trên trình duyệt.
                   </p>
                 </div>
               )}
 
               {selectedModel === 'deepseek' && (
-                <div className="space-y-2 pt-3 border-t border-neutral-300 animate-fadeIn">
-                  <label htmlFor="deepseek-key-input" className="text-xs font-black uppercase text-neutral-800 block">
+                <div className="space-y-2 pt-4 border-t border-black/[0.04] animate-fadeIn">
+                  <label htmlFor="deepseek-key-input" className="text-xs font-bold uppercase text-neutral-600 block">
                     🔑 Nhập DeepSeek API Key
                   </label>
                   <input
@@ -1138,10 +1153,10 @@ export default function TranslationStudio() {
                       localStorage.setItem('deepseek_api_key', e.target.value);
                     }}
                     placeholder="sk-..."
-                    className="w-full text-xs font-bold p-2.5 border-2 border-black rounded-sm bg-white focus:outline-none focus:ring-1 focus:ring-black"
+                    className="w-full text-xs font-semibold p-3 border border-black/10 rounded-full bg-white/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0066cc]/30 focus:border-[#0066cc] shadow-inner transition-all duration-200"
                   />
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                    Lấy key tại platform.deepseek.com. Key được lưu cục bộ trên trình duyệt của bạn.
+                  <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider pl-1.5">
+                    Lấy key tại platform.deepseek.com. Key được lưu cục bộ an toàn trên trình duyệt.
                   </p>
                 </div>
               )}
@@ -1150,7 +1165,7 @@ export default function TranslationStudio() {
               <button
                 type="button"
                 onClick={startTranslationProcess}
-                className="w-full text-xs sm:text-sm uppercase font-extrabold tracking-widest py-3 bg-black hover:bg-neutral-800 text-[#fcfbf7] rounded-sm active:scale-[0.98] transition-all text-center shadow-md flex items-center justify-center gap-2"
+                className="w-full py-4 bg-gradient-to-r from-[#0066cc] via-[#862e9c] to-[#ff2e93] hover:from-[#0071e3] hover:to-[#ff3b30] text-white font-sans font-bold text-xs sm:text-sm uppercase tracking-wider rounded-full shadow-lg shadow-purple-500/20 active:scale-[0.96] hover:shadow-xl hover:shadow-purple-500/30 hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 apple-button-transition cursor-pointer"
               >
                 🚀 BẮT ĐẦU DỊCH THUẬT AI TOÀN BỘ NỘI DUNG FILE
               </button>
@@ -1161,37 +1176,37 @@ export default function TranslationStudio() {
 
       {/* Parsing & Translation Simulation Screen */}
       {(phase === 'parsing' || phase === 'translating') && (
-        <div className="space-y-6 animate-fadeIn">
+        <div className="space-y-8 animate-fadeIn relative z-10">
           
           {/* Progress bar info */}
-          <div className="bg-[#f5f2eb] border-2 border-black p-4 rounded-md space-y-2">
-            <div className="flex justify-between items-baseline flex-wrap gap-2 text-xs font-black uppercase tracking-wider">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 bg-red-700 rounded-full inline-block animate-ping" />
+          <div className="bg-white/50 border border-black/[0.05] p-5 rounded-2xl space-y-3 shadow-sm">
+            <div className="flex justify-between items-baseline flex-wrap gap-2 text-xs font-bold uppercase tracking-wider">
+              <span className="flex items-center gap-2 text-neutral-700">
+                <span className="w-2.5 h-2.5 bg-[#ff2e93] rounded-full inline-block animate-ping" />
                 TIẾN TRÌNH DỊCH THUẬT THỰC TẾ
               </span>
-              <span>{progress}% Hoàn thành</span>
+              <span className="font-apple-display text-[#1d1d1f] font-semibold">{progress}% Hoàn thành</span>
             </div>
             
-            <div className="w-full bg-neutral-300 h-3 rounded-full overflow-hidden border border-black">
+            <div className="w-full bg-neutral-200/60 h-2.5 rounded-full overflow-hidden border border-black/[0.04]">
               <div 
-                className="bg-black h-full transition-all duration-300 ease-out" 
+                className="bg-gradient-to-r from-[#0066cc] via-[#862e9c] to-[#ff2e93] h-full rounded-full transition-all duration-300 ease-out animate-pulseGlow" 
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-xs text-neutral-600 font-bold uppercase tracking-tight pt-1 leading-normal">
-              Trạng thái: <span className="text-black font-extrabold">{statusText}</span>
+            <p className="text-xs text-neutral-500 font-medium uppercase tracking-tight pt-1 leading-normal">
+              Trạng thái: <span className="text-[#1d1d1f] font-bold">{statusText}</span>
             </p>
           </div>
 
           {/* Bilingual Live Stream Box */}
           {blocks.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-neutral-500">
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 pl-1">
                 DÒNG DỊCH THUẬT SONG NGỮ THEO KHỐI THỰC TẾ TRONG FILE CỦA BẠN
               </h3>
 
-              <div className="space-y-4 max-h-[350px] overflow-y-auto border-2 border-neutral-300 p-4 rounded bg-white">
+              <div className="space-y-4 max-h-[380px] overflow-y-auto border border-black/[0.06] p-4 rounded-2xl bg-white/40 shadow-inner">
                 {blocks.map((block: any, idx) => {
                   const isPending = block.status === 'pending';
                   const isTranslating = block.status === 'translating';
@@ -1199,72 +1214,72 @@ export default function TranslationStudio() {
                   const isBypassed = block.shouldTranslate === false;
 
                   let typeLabel = "Nội dung bài báo";
-                  let typeBadgeColor = "bg-emerald-100 text-emerald-850 border-emerald-200";
+                  let typeBadgeColor = "bg-blue-50 text-blue-800 border-blue-100/50";
                   let blockStyle = "";
                   
                   if (block.skipDisplay) {
                     typeLabel = "Lề biên học thuật - Đã ẩn";
-                    typeBadgeColor = "bg-neutral-200 text-neutral-500 border-neutral-300 font-normal";
-                    blockStyle = "bg-neutral-100/50 border-neutral-200 opacity-60";
+                    typeBadgeColor = "bg-neutral-100 text-neutral-400 border-transparent font-normal";
+                    blockStyle = "bg-neutral-50/30 border-neutral-100 opacity-50";
                   } else if (block.type === 'header') {
                     typeLabel = "Header Lề trên - Giữ nguyên";
-                    typeBadgeColor = "bg-neutral-200 text-neutral-700 border-neutral-350";
-                    blockStyle = "bg-neutral-50/50 border-neutral-200";
+                    typeBadgeColor = "bg-neutral-100 text-neutral-500 border-transparent";
+                    blockStyle = "bg-neutral-50/20 border-neutral-100";
                   } else if (block.type === 'footer') {
                     typeLabel = "Footer Lề dưới - Giữ nguyên";
-                    typeBadgeColor = "bg-neutral-200 text-neutral-700 border-neutral-350";
-                    blockStyle = "bg-neutral-50/50 border-neutral-200";
+                    typeBadgeColor = "bg-neutral-100 text-neutral-500 border-transparent";
+                    blockStyle = "bg-neutral-50/20 border-neutral-100";
                   } else if (block.type === 'title') {
                     typeLabel = "Tiêu đề lớn nhất - Cần dịch";
-                    typeBadgeColor = "bg-rose-100 text-rose-800 border-rose-300 font-extrabold";
-                    blockStyle = "bg-rose-50/30 border-rose-200";
+                    typeBadgeColor = "bg-purple-50 text-purple-800 border-purple-100 font-bold";
+                    blockStyle = "bg-purple-50/20 border-purple-100";
                   } else if (block.type === 'small') {
                     typeLabel = "Trích dẫn / Phụ lục - Giữ nguyên";
-                    typeBadgeColor = "bg-blue-100 text-blue-800 border-blue-200";
-                    blockStyle = "bg-blue-50/30 border-blue-200";
+                    typeBadgeColor = "bg-amber-50 text-amber-800 border-amber-100";
+                    blockStyle = "bg-amber-50/20 border-amber-100";
                   }
 
                   return (
                     <div 
                       key={idx} 
-                      className={`grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-neutral-200 pb-4 last:border-0 last:pb-0 transition-all duration-300 ${
+                      className={`grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-black/[0.05] pb-4 last:border-0 last:pb-0 transition-all duration-300 ${
                         isPending ? 'opacity-30' : 'opacity-100'
                       }`}
                     >
                       {/* English Block */}
-                      <div className={`p-3 rounded border relative ${blockStyle || 'bg-neutral-50 border-neutral-200'}`}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-sans font-black uppercase tracking-wider ${typeBadgeColor}`}>
+                      <div className={`p-4 rounded-2xl border border-black/[0.04] relative ${blockStyle || 'bg-white shadow-sm'}`}>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-sans font-bold uppercase tracking-wider ${typeBadgeColor}`}>
                             {typeLabel}
                           </span>
-                          <span className="text-[9px] font-sans font-black text-neutral-400 uppercase tracking-widest">
+                          <span className="text-[9px] font-sans font-bold text-neutral-400 uppercase tracking-widest">
                             Trang {block.page} • Khối {idx + 1}
                           </span>
                         </div>
-                        <p className={`font-sans text-neutral-850 leading-relaxed pt-1 ${block.type === 'title' ? 'text-xs font-black uppercase' : block.type === 'small' || block.type === 'header' || block.type === 'footer' ? 'text-xs italic text-neutral-600' : 'text-xs font-semibold text-neutral-800'}`}>
+                        <p className={`font-sans text-neutral-800 leading-relaxed pt-1 text-apple-body ${block.type === 'title' ? 'text-xs font-bold uppercase' : block.type === 'small' || block.type === 'header' || block.type === 'footer' ? 'text-xs italic text-neutral-500' : 'text-xs font-normal'}`}>
                           {block.en}
                         </p>
                       </div>
 
                       {/* Vietnamese Block */}
-                      <div className={`p-3 rounded border relative transition-all duration-300 ${
+                      <div className={`p-4 rounded-2xl border relative transition-all duration-300 ${
                         isTranslating
-                          ? 'bg-amber-50/50 border-amber-400 shadow-sm shadow-amber-100'
+                          ? 'bg-amber-500/[0.08] border-amber-300 shadow-sm animate-pulse'
                           : isBypassed
-                          ? 'bg-neutral-100/50 border-neutral-300'
+                          ? 'bg-neutral-100/30 border-black/[0.04]'
                           : isDone
-                          ? 'bg-emerald-50/30 border-emerald-400'
-                          : 'bg-neutral-50/30 border-neutral-200'
+                          ? 'bg-gradient-to-r from-[#0066cc]/5 to-[#ff2e93]/5 border-[#0066cc]/10 shadow-sm'
+                          : 'bg-neutral-50/20 border-black/[0.04]'
                       }`}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-sans font-black uppercase tracking-wider ${
+                        <div className="flex justify-between items-center mb-2">
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-sans font-bold uppercase tracking-wider ${
                             block.skipDisplay
-                              ? 'bg-neutral-200 text-neutral-500'
+                              ? 'bg-neutral-200 text-neutral-400'
                               : isBypassed 
-                              ? 'bg-neutral-200 text-neutral-600' 
+                              ? 'bg-neutral-200 text-neutral-500' 
                               : isTranslating 
                               ? 'bg-amber-100 text-amber-800 animate-pulse' 
-                              : 'bg-emerald-100 text-emerald-800'
+                              : 'bg-gradient-to-r from-[#0066cc]/10 to-[#ff2e93]/10 text-[#0066cc]'
                           }`}>
                             {block.skipDisplay ? "Đã ẩn ở bản dịch" : isBypassed ? "Không dịch (English gốc)" : "Bản dịch VI"}
                           </span>
@@ -1277,11 +1292,11 @@ export default function TranslationStudio() {
                         )}
 
                         {isTranslating && (
-                          <div className="pt-2 space-y-1">
+                          <div className="pt-2 space-y-1.5">
                             <p className="text-xs font-sans text-amber-800 font-bold leading-relaxed animate-pulse">
                               Đang phân tích cấu trúc ngữ nghĩa...
                             </p>
-                            <span className="inline-flex gap-1 items-center text-[10px] text-amber-700 font-bold uppercase tracking-widest pt-1">
+                            <span className="inline-flex gap-1.5 items-center text-[10px] text-amber-700 font-bold uppercase tracking-widest pt-1">
                               <span className="w-1.5 h-1.5 bg-amber-600 rounded-full animate-bounce" />
                               Đang chuyển ngữ AI...
                             </span>
@@ -1289,16 +1304,16 @@ export default function TranslationStudio() {
                         )}
 
                         {isDone && (
-                          <p className={`font-sans leading-relaxed pt-1 animate-fadeIn ${
+                          <p className={`font-sans leading-relaxed pt-1 text-apple-body animate-fadeIn ${
                             block.skipDisplay
                               ? 'text-neutral-400 italic text-[11px]'
                               : block.type === 'title' 
-                              ? 'text-xs font-black uppercase text-rose-950' 
+                              ? 'text-xs font-bold uppercase text-neutral-800' 
                               : block.type === 'small' || block.type === 'header' || block.type === 'footer'
-                              ? 'text-xs text-neutral-600 italic'
+                              ? 'text-xs text-neutral-500 italic'
                               : layoutStyle === 'bilingual' 
-                              ? 'text-xs font-extrabold text-neutral-900' 
-                              : 'text-xs text-emerald-950 font-semibold'
+                              ? 'text-xs font-semibold text-neutral-900' 
+                              : 'text-xs text-neutral-800'
                           }`}>
                             {block.skipDisplay ? "[Dòng này là nhiễu lề biên / số trang / copyright - Đã loại bỏ hoàn toàn khỏi bản dịch]" : block.vi}
                           </p>
@@ -1316,46 +1331,46 @@ export default function TranslationStudio() {
 
       {/* Compilation Completed Screen */}
       {phase === 'completed' && (
-        <div className="space-y-6 text-center animate-fadeIn">
+        <div className="space-y-8 text-center animate-fadeIn relative z-10">
           
-          {/* Success card */}
-          <div className="bg-emerald-50 border-2 border-emerald-500 p-6 rounded-md space-y-3">
-            <div className="w-16 h-16 bg-emerald-100 border-2 border-emerald-500 rounded-full flex items-center justify-center mx-auto text-emerald-600 animate-bounce">
-              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+          {/* Success card with iPhone glowing badge */}
+          <div className="bg-white/60 border border-black/[0.05] p-8 rounded-3xl space-y-4 shadow-sm max-w-xl mx-auto">
+            <div className="w-16 h-16 bg-gradient-to-tr from-[#0066cc] via-[#862e9c] to-[#ff2e93] rounded-full flex items-center justify-center mx-auto text-white shadow-lg shadow-purple-500/25 animate-bounce">
+              <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-lg sm:text-xl font-sans font-black uppercase tracking-tight text-emerald-950">
-              DỊCH TOÀN BỘ FILE &amp; CHẾ BẢN HOÀN TẤT!
+            <h3 className="font-apple-display text-lg sm:text-xl font-semibold tracking-tight text-[#1d1d1f]">
+              DỊCH TOÀN BỘ FILE &amp; CHẾ BẢN HOÀN TẤT
             </h3>
-            <p className="text-xs sm:text-sm text-emerald-800 max-w-xl mx-auto leading-relaxed font-semibold">
-              Tệp tài liệu <span className="font-extrabold text-black">"{file?.name}"</span> ({totalPages} trang) đã được dịch thành công toàn bộ nội dung văn bản sang tiếng Việt và đóng gói sẵn sàng.
+            <p className="text-xs sm:text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">
+              Tệp tài liệu <span className="font-semibold text-black">"{file?.name}"</span> ({totalPages} trang) đã được dịch thuật thành công toàn bộ nội dung văn bản sang tiếng Việt và đóng gói sẵn sàng.
             </p>
           </div>
 
-          {/* Export Options Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto pt-2">
+          {/* Export Options Grid with iPhone glow border buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto pt-2 select-none">
             
             {/* Export PDF */}
             {(exportFormat === 'both' || exportFormat === 'pdf') && (
               <button
                 type="button"
                 onClick={handleDownloadPdf}
-                className="bg-[#fcfbf7] border-2 border-black p-5 rounded hover:bg-neutral-50 active:scale-95 transition-all text-left flex flex-col justify-between h-40 group cursor-pointer shadow-sm hover:shadow-md"
+                className="bg-white/65 border border-black/[0.05] p-6 rounded-2xl hover:bg-white/80 active:scale-95 transition-all text-left flex flex-col justify-between h-44 group cursor-pointer shadow-sm hover:shadow-md hover:border-transparent relative overflow-hidden iphone-glow-border apple-button-transition"
               >
                 <div className="space-y-1">
-                  <span className="text-[10px] font-sans font-black uppercase text-red-700 tracking-wider">
-                    Bảo toàn cấu trúc trang
+                  <span className="text-[10px] font-sans font-bold uppercase text-[#0066cc] tracking-wider bg-blue-50 px-2 py-0.5 rounded-full inline-block mb-1">
+                    Bản đối chiếu dàn trang
                   </span>
-                  <h4 className="text-sm font-black font-sans uppercase tracking-tight group-hover:text-blue-900 transition-colors">
+                  <h4 className="text-sm font-semibold tracking-tight font-apple-display group-hover:text-[#0066cc] transition-colors">
                     TẢI BẢN DỊCH PDF DÀN TRANG (.pdf)
                   </h4>
-                  <p className="text-xs text-neutral-500 font-sans leading-relaxed pt-1.5">
-                    Kết xuất tài liệu dạng đa cột học thuật, dàn trang đối chiếu thích hợp lưu trữ hoặc in ấn.
+                  <p className="text-[11px] text-neutral-400 leading-normal pt-1.5">
+                    Kết xuất tài liệu dạng đa cột học thuật, dàn trang song hành song ngữ, thích hợp lưu trữ hoặc in ấn.
                   </p>
                 </div>
-                <span className="text-xs font-black uppercase text-black group-hover:translate-x-1.5 transition-transform inline-flex items-center gap-1 mt-2">
-                  Tải xuống PDF →
+                <span className="text-xs font-bold uppercase text-[#1d1d1f] group-hover:translate-x-1.5 transition-transform inline-flex items-center gap-1 mt-3">
+                  Tải xuống PDF <span className="text-[#0066cc]">→</span>
                 </span>
               </button>
             )}
@@ -1365,60 +1380,60 @@ export default function TranslationStudio() {
               <button
                 type="button"
                 onClick={handleDownloadEpub}
-                className="bg-[#fcfbf7] border-2 border-black p-5 rounded hover:bg-neutral-50 active:scale-95 transition-all text-left flex flex-col justify-between h-40 group cursor-pointer shadow-sm hover:shadow-md"
+                className="bg-white/65 border border-black/[0.05] p-6 rounded-2xl hover:bg-white/80 active:scale-95 transition-all text-left flex flex-col justify-between h-44 group cursor-pointer shadow-sm hover:shadow-md hover:border-transparent relative overflow-hidden iphone-glow-border apple-button-transition"
               >
                 <div className="space-y-1">
-                  <span className="text-[10px] font-sans font-black uppercase text-red-700 tracking-wider">
-                    Tối ưu màn hình di động
+                  <span className="text-[10px] font-sans font-bold uppercase text-[#ff2e93] tracking-wider bg-pink-50 px-2 py-0.5 rounded-full inline-block mb-1">
+                    Tương thích e-Reader
                   </span>
-                  <h4 className="text-sm font-black font-sans uppercase tracking-tight group-hover:text-blue-900 transition-colors">
+                  <h4 className="text-sm font-semibold tracking-tight font-apple-display group-hover:text-[#ff2e93] transition-colors">
                     TẢI SÁCH ĐIỆN TỬ EPUB (.epub)
                   </h4>
-                  <p className="text-xs text-neutral-500 font-sans leading-relaxed pt-1.5">
-                    Tương thích hoàn hảo với Kindle, Apple Books, tự động điều chỉnh cỡ chữ và cuộn trang mượt mà.
+                  <p className="text-[11px] text-neutral-400 leading-normal pt-1.5">
+                    Tương thích hoàn hảo với Kindle, Apple Books, tự động giãn dòng mượt mà trên di động.
                   </p>
                 </div>
-                <span className="text-xs font-black uppercase text-black group-hover:translate-x-1.5 transition-transform inline-flex items-center gap-1 mt-2">
-                  Tải xuống EPUB →
+                <span className="text-xs font-bold uppercase text-[#1d1d1f] group-hover:translate-x-1.5 transition-transform inline-flex items-center gap-1 mt-3">
+                  Tải xuống EPUB <span className="text-[#ff2e93]">→</span>
                 </span>
               </button>
             )}
 
           </div>
 
-          {/* Document Live Preview */}
-          <div className="max-w-2xl mx-auto border-2 border-black rounded-md overflow-hidden bg-white text-left shadow-sm mt-6">
-            <div className="bg-[#f5f2eb] border-b-2 border-black p-3 font-sans font-black text-xs uppercase tracking-wider flex items-center justify-between">
-              <span>📖 XEM TRƯỚC BẢN IN SONG NGỮ THỰC TẾ (PAGE PREVIEW)</span>
-              <span className="text-[10px] bg-black text-white px-2 py-0.5 rounded">Times New Roman • 14pt</span>
+          {/* Document Live Preview with Frosted title header */}
+          <div className="max-w-2xl mx-auto border border-black/[0.06] rounded-2xl overflow-hidden bg-white/70 shadow-sm mt-8">
+            <div className="bg-[#fafafc]/95 border-b border-black/[0.05] px-4 py-3.5 font-sans font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+              <span className="text-neutral-500 font-semibold flex items-center gap-1.5">📖 XEM TRƯỚC BẢN IN SONG NGỮ (PAGE PREVIEW)</span>
+              <span className="text-[10px] bg-black/10 text-neutral-700 px-2.5 py-0.5 rounded-full font-bold">Times New Roman • 14pt</span>
             </div>
             
             <div className="p-6 max-h-[350px] overflow-y-auto font-serif" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
               {/* PDF style header */}
-              <div className="border-b-2 border-double border-black pb-3 mb-4 text-center">
+              <div className="border-b border-black/10 pb-3 mb-4 text-center">
                 <h4 className="font-bold text-lg uppercase tracking-tight m-0 text-black">
                   TÀI LIỆU DỊCH THUẬT SONG NGỮ
                 </h4>
-                <p className="text-[10px] font-sans font-bold text-neutral-500 uppercase tracking-wide mt-1">
+                <p className="text-[10px] font-sans font-bold text-neutral-400 uppercase tracking-wide mt-1">
                   Sách gốc: {file?.name} • Biên dịch: AI Document Translator • Ngôn ngữ: Anh - Việt
                 </p>
               </div>
 
               {/* Sample pages content */}
-              <div className="space-y-4 text-sm leading-relaxed text-[#111111] text-justify">
+              <div className="space-y-4 text-sm leading-relaxed text-[#1d1d1f] text-justify">
                 {layoutStyle === 'bilingual' ? (
                   blocks.slice(0, 15).map((b: any, idx) => {
-                    if (b.skipDisplay) return null; // Bỏ qua lề biên học thuật
+                    if (b.skipDisplay) return null;
                     if (b.shouldTranslate === false) {
                       if (b.type === 'header' || b.type === 'footer') {
                         return (
-                          <div key={idx} className="text-center text-[10px] text-neutral-500 font-sans tracking-wide uppercase my-2 py-1 border-y border-dashed border-neutral-200">
+                          <div key={idx} className="text-center text-[10px] text-neutral-400 font-sans tracking-wide uppercase my-2 py-1 border-y border-dashed border-neutral-100">
                             {b.en}
                           </div>
                         );
                       } else if (b.type === 'small') {
                         return (
-                          <div key={idx} className="text-xs text-neutral-600 pl-4 border-l-2 border-neutral-300 italic my-3">
+                          <div key={idx} className="text-xs text-neutral-500 pl-4 border-l-2 border-neutral-300 italic my-3">
                             {b.en}
                           </div>
                         );
@@ -1444,24 +1459,24 @@ export default function TranslationStudio() {
                       return (
                         <React.Fragment key={idx}>
                           <p style={{ textIndent: '1.5em', margin: '0 0 4px 0' }}>{b.en}</p>
-                          <p style={{ textIndent: '1.5em', margin: '0 0 14px 0', fontWeight: 'bold', color: '#111111' }}>{b.vi}</p>
+                          <p style={{ textIndent: '1.5em', margin: '0 0 14px 0', fontWeight: 'bold', color: '#1d1d1f' }}>{b.vi}</p>
                         </React.Fragment>
                       );
                     }
                   })
                 ) : (
                   blocks.slice(0, 15).map((b: any, idx) => {
-                    if (b.skipDisplay) return null; // Bỏ qua lề biên học thuật
+                    if (b.skipDisplay) return null;
                     if (b.shouldTranslate === false) {
                       if (b.type === 'header' || b.type === 'footer') {
                         return (
-                          <div key={idx} className="text-center text-[10px] text-neutral-500 font-sans tracking-wide uppercase my-2 py-1 border-y border-dashed border-neutral-200">
+                          <div key={idx} className="text-center text-[10px] text-neutral-400 font-sans tracking-wide uppercase my-2 py-1 border-y border-dashed border-neutral-100">
                             {b.en}
                           </div>
                         );
                       } else if (b.type === 'small') {
                         return (
-                          <div key={idx} className="text-xs text-neutral-600 pl-4 border-l-2 border-neutral-300 italic my-3">
+                          <div key={idx} className="text-xs text-neutral-500 pl-4 border-l-2 border-neutral-300 italic my-3">
                             {b.en}
                           </div>
                         );
@@ -1495,11 +1510,11 @@ export default function TranslationStudio() {
           </div>
 
           {/* Reset / Return button */}
-          <div className="pt-6">
+          <div className="pt-4">
             <button
               type="button"
               onClick={resetStudio}
-              className="text-xs uppercase font-extrabold tracking-widest px-6 py-2.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 rounded-sm active:scale-95 transition-all border border-neutral-400"
+              className="text-xs uppercase font-bold tracking-wider px-6 py-3 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 rounded-full active:scale-95 transition-all border border-black/[0.04] apple-button-transition cursor-pointer"
             >
               Quay lại dịch file mới
             </button>
